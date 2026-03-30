@@ -299,6 +299,27 @@ const LogPanel = forwardRef(function LogPanel({
           <div className="context-menu-item" onClick={() => { navigator.clipboard.writeText(lines.find(l => l.num === contextMenu.lineNum)?.text || ''); closeContextMenu(); }}>
             复制该行
           </div>
+          <div className="context-menu-item" onClick={() => {
+            // Copy line with line number
+            const line = lines.find(l => l.num === contextMenu.lineNum);
+            if (line) navigator.clipboard.writeText(`L${line.num}: ${line.text}`);
+            closeContextMenu();
+          }}>
+            复制行号+内容
+          </div>
+          <div className="context-menu-item" onClick={() => {
+            // Copy 5 lines around context
+            const idx = lines.findIndex(l => l.num === contextMenu.lineNum);
+            if (idx >= 0) {
+              const start = Math.max(0, idx - 2);
+              const end = Math.min(lines.length, idx + 3);
+              const text = lines.slice(start, end).map(l => `L${l.num}: ${l.text}`).join('\n');
+              navigator.clipboard.writeText(text);
+            }
+            closeContextMenu();
+          }}>
+            复制上下文 (±2行)
+          </div>
         </div>
       )}
 
