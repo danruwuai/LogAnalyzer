@@ -107,7 +107,11 @@ app.on('window-all-closed', () => {
 });
 
 app.on('activate', () => {
-  if (mainWindow === null) createWindow();
+  if (mainWindow === null) {
+    createWindow();
+  } else {
+    mainWindow.show();
+  }
 });
 
 // --- IPC Handlers ---
@@ -168,9 +172,13 @@ ipcMain.handle('file:readStream', async (event, filePath) => {
 
 ipcMain.handle('file:readFull', async (_, filePath) => {
   try {
+    const stat = fs.statSync(filePath);
+    const MAX_SIZE = 50 * 1024 * 1024; // 50MB limit for sync read
+    if (stat.size > MAX_SIZE) {
+      return { success: false, error: `文件过大 (${(stat.size / 1024 / 1024).toFixed(1)}MB)，请使用流式加载或选择小于 50MB 的文件` };
+    }
     const content = fs.readFileSync(filePath, 'utf-8');
     const lines = content.split('\n').map((text, i) => ({ num: i + 1, text }));
-    const stat = fs.statSync(filePath);
     return { success: true, lines, totalLines: lines.length, fileSize: stat.size, filePath };
   } catch (err) {
     return { success: false, error: err.message };

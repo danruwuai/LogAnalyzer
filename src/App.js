@@ -105,24 +105,8 @@ export default function App() {
   // Load file
   const handleOpenFile = useCallback(async () => {
     const path = await window.api.openFile();
-    if (!path) return;
-    setLoading(true);
-    setFilePath(path);
-    setFileName(path.split(/[/\\]/).pop());
-    setLines([]);
-    setBookmarks(new Set());
-    setAnnotations({});
-    setChartLinkedLine(null);
-    const result = await window.api.readFull(path);
-    if (result.success) {
-      setLines(result.lines);
-      setTotalLines(result.totalLines);
-      setFileSize(result.fileSize);
-      const annoResult = await window.api.loadAnnotations(path);
-      if (annoResult.success) setAnnotations(annoResult.annotations);
-    }
-    setLoading(false);
-  }, []);
+    if (path) await loadFileFromPath(path);
+  }, [loadFileFromPath]);
 
   // Save annotations
   const saveAnnotations = useCallback(async (newAnnotations) => {
@@ -198,9 +182,14 @@ export default function App() {
     setChartLinkedLine(lineNum);
   }, []);
 
-  const [searchMatchCount, setSearchMatchCount] = useState(0);
   const [showJumpToLine, setShowJumpToLine] = useState(false);
   const [jumpLineNum, setJumpLineNum] = useState('');
+
+  // Search match count (memoized for performance)
+  const searchMatchCount = React.useMemo(() =>
+    searchTerm ? filteredLines.filter(l => l.text.toLowerCase().includes(searchTerm.toLowerCase())).length : 0,
+    [filteredLines, searchTerm]
+  );
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -222,26 +211,33 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleOpenFile]);
 
+  // Load file from path (shared logic, avoids duplication)
+  const loadFileFromPath = useCallback(async (fPath) => {
+    setLoading(true);
+    setFilePath(fPath);
+    setFileName(fPath.split(/[/\\]/).pop());
+    setLines([]); setBookmarks(new Set()); setAnnotations({}); setChartLinkedLine(null);
+    const result = await window.api.readFull(fPath);
+    if (result.success) {
+      setLines(result.lines);
+      setTotalLines(result.totalLines);
+      setFileSize(result.fileSize);
+      const annoResult = await window.api.loadAnnotations(fPath);
+      if (annoResult.success) setAnnotations(annoResult.annotations);
+    }
+    setLoading(false);
+  }, []);
+
   // Auto-load for demo & menu events
   useEffect(() => {
     if (window.api?.onAutoLoadFile) {
       window.api.onAutoLoadFile(async (filePath) => {
-        setLoading(true);
-        setFilePath(filePath);
-        setFileName(filePath.split(/[/\\]/).pop());
-        setLines([]); setBookmarks(new Set()); setAnnotations({}); setChartLinkedLine(null);
-        const result = await window.api.readFull(filePath);
-        if (result.success) {
-          setLines(result.lines);
-          setTotalLines(result.totalLines);
-          setFileSize(result.fileSize);
-          setFilterItems([
-            { id: Date.now(), enabled: true, keyword: 'INFO', caseSensitive: false, isRegex: false, exclude: false, highlightRow: false, bgColor: 'rgba(137, 180, 250, 0.15)', fgColor: '#89b4fa', fontColor: '' },
-            { id: Date.now()+1, enabled: true, keyword: 'WARN', caseSensitive: false, isRegex: false, exclude: false, highlightRow: true, bgColor: 'rgba(249, 226, 175, 0.15)', fgColor: '#f9e2af', fontColor: '' },
-            { id: Date.now()+2, enabled: true, keyword: 'ERROR', caseSensitive: false, isRegex: false, exclude: false, highlightRow: true, bgColor: 'rgba(243, 139, 168, 0.15)', fgColor: '#f38ba8', fontColor: '#ffffff' },
-          ]);
-        }
-        setLoading(false);
+        await loadFileFromPath(filePath);
+        setFilterItems([
+          { id: Date.now(), enabled: true, keyword: 'INFO', caseSensitive: false, isRegex: false, exclude: false, highlightRow: false, bgColor: 'rgba(137, 180, 250, 0.15)', fgColor: '#89b4fa', fontColor: '' },
+          { id: Date.now()+1, enabled: true, keyword: 'WARN', caseSensitive: false, isRegex: false, exclude: false, highlightRow: true, bgColor: 'rgba(249, 226, 175, 0.15)', fgColor: '#f9e2af', fontColor: '' },
+          { id: Date.now()+2, enabled: true, keyword: 'ERROR', caseSensitive: false, isRegex: false, exclude: false, highlightRow: true, bgColor: 'rgba(243, 139, 168, 0.15)', fgColor: '#f38ba8', fontColor: '#ffffff' },
+        ]);
       });
     }
     if (window.api?.onConfigureExtractors) {
@@ -251,16 +247,12 @@ export default function App() {
         if (config.extractors) setExtractors(config.extractors);
       });
     }
-    // Menu events - store handler refs for cleanup
-    const menuOpenHandler = () => handleOpenFile();
-    const menuSwitchHandler = (tab) => { setBottomPanel(tab); setShowBottomPanel(true); };
-    const menuHelpHandler = () => setShowHelp(prev => !prev);
-    if (window.api?.onMenuOpenFile) window.api.onMenuOpenFile(menuOpenHandler);
-    if (window.api?.onMenuSwitchTab) window.api.onMenuSwitchTab(menuSwitchHandler);
-    if (window.api?.onMenuHelp) window.api.onMenuHelp(menuHelpHandler);
+    // Menu events
+    if (window.api?.onMenuOpenFile) window.api.onMenuOpenFile(() => handleOpenFile());
+    if (window.api?.onMenuSwitchTab) window.api.onMenuSwitchTab((tab) => { setBottomPanel(tab); setShowBottomPanel(true); });
+    if (window.api?.onMenuHelp) window.api.onMenuHelp(() => setShowHelp(prev => !prev));
 
     return () => {
-      // Clean up ipcRenderer listeners to prevent accumulation
       if (window.api?.removeAllListeners) {
         window.api.removeAllListeners('auto-load-file');
         window.api.removeAllListeners('configure-extractors');
@@ -269,24 +261,14 @@ export default function App() {
         window.api.removeAllListeners('menu:help');
       }
     };
-  }, [handleOpenFile]);
+  }, [handleOpenFile, loadFileFromPath]);
 
   // File drop
   const handleDrop = useCallback((e) => {
     e.preventDefault();
     const file = e.dataTransfer?.files?.[0];
-    if (file?.path) {
-      (async () => {
-        setLoading(true);
-        setFilePath(file.path);
-        setFileName(file.path.split(/[/\\]/).pop());
-        setLines([]); setBookmarks(new Set()); setAnnotations({}); setChartLinkedLine(null);
-        const result = await window.api.readFull(file.path);
-        if (result.success) { setLines(result.lines); setTotalLines(result.totalLines); setFileSize(result.fileSize); }
-        setLoading(false);
-      })();
-    }
-  }, []);
+    if (file?.path) loadFileFromPath(file.path);
+  }, [loadFileFromPath]);
 
   // Export filtered lines
   const handleExportFiltered = useCallback(() => {
@@ -331,7 +313,7 @@ export default function App() {
         }}
         loading={loading}
         fileName={fileName}
-        searchMatchCount={searchTerm ? filteredLines.filter(l => l.text.toLowerCase().includes(searchTerm.toLowerCase())).length : 0}
+        searchMatchCount={searchMatchCount}
         onJumpToLine={() => setShowJumpToLine(true)}
       />
 
@@ -576,11 +558,26 @@ function ChartPanelInline({ lines, extractors, onAddExtractor, onUpdateExtractor
 
     const metricNames = extractors.map(e => e.name).filter(n => n !== 'seqNum' && n !== 'isConverge');
     const xData = xAxisMode === 'data' ? chartData.map(d => d[xAxisField] ?? d.lineNum) : chartData.map(d => d.lineNum);
-    const series = metricNames.map(name => ({
-      name, type: 'line', data: chartData.map(d => d[name] ?? null),
-      smooth: true, symbol: 'circle', symbolSize: 3,
-      lineStyle: { width: 2 }, itemStyle: { color: extractors.find(e => e.name === name)?.color || '#89b4fa' },
-    }));
+    const series = metricNames.map(name => {
+      const s = {
+        name, type: 'line', data: chartData.map(d => d[name] ?? null),
+        smooth: true, symbol: 'circle', symbolSize: 3,
+        lineStyle: { width: 2 }, itemStyle: { color: extractors.find(e => e.name === name)?.color || '#89b4fa' },
+      };
+      // Add threshold markLines for matching metrics
+      const matchingThresholds = thresholds.filter(t => !t.metric || t.metric === name);
+      if (matchingThresholds.length > 0) {
+        s.markLine = {
+          silent: true, symbol: 'none',
+          data: matchingThresholds.map(t => ({
+            yAxis: t.value, name: t.name,
+            lineStyle: { color: t.color, type: 'dashed', width: 1 },
+            label: { formatter: t.name, color: t.color, fontSize: 10 },
+          })),
+        };
+      }
+      return s;
+    });
 
     chartInstance.current.setOption({
       backgroundColor: 'transparent',
@@ -595,8 +592,20 @@ function ChartPanelInline({ lines, extractors, onAddExtractor, onUpdateExtractor
 
     const handleResize = () => chartInstance.current?.resize();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [chartData, extractors, xAxisMode, xAxisField]);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [chartData, extractors, xAxisMode, xAxisField, thresholds]);
+
+  // Cleanup chart instance on unmount
+  useEffect(() => {
+    return () => {
+      if (chartInstance.current) {
+        chartInstance.current.dispose();
+        chartInstance.current = null;
+      }
+    };
+  }, []);
 
   return (
     <div>
@@ -606,6 +615,29 @@ function ChartPanelInline({ lines, extractors, onAddExtractor, onUpdateExtractor
         </select>
         {xAxisMode === 'data' && <input className="toolbar-input" style={{ width: 100 }} placeholder="字段名" value={xAxisField} onChange={e => onXAxisFieldChange(e.target.value)} />}
         <button className="toolbar-btn small" onClick={onAddExtractor}>+ 指标</button>
+        <button className="toolbar-btn small" onClick={onAddThreshold}>+ 阈值线</button>
+        {chartData && chartData.length > 0 && (
+          <>
+            <button className="toolbar-btn small" onClick={() => {
+              if (!chartInstance.current) return;
+              const url = chartInstance.current.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#1e1e2e' });
+              const a = document.createElement('a');
+              a.href = url; a.download = 'chart.png'; a.click();
+            }}>保存图表</button>
+            <button className="toolbar-btn small" onClick={() => {
+              if (!chartData || chartData.length === 0) return;
+              const metricNames = extractors.map(e => e.name);
+              const headers = ['lineNum', ...metricNames];
+              const rows = chartData.map(d => headers.map(h => d[h] ?? '').join(','));
+              const csv = [headers.join(','), ...rows].join('\n');
+              const blob = new Blob([csv], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url; a.download = 'chart_data.csv'; a.click();
+              URL.revokeObjectURL(url);
+            }}>导出CSV</button>
+          </>
+        )}
       </div>
       {/* Stats summary */}
       {chartData && chartData.length > 0 && (

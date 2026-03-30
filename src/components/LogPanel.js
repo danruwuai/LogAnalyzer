@@ -1,8 +1,33 @@
-import React, { useRef, useState, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { Icons } from './Icons';
 
 const LINE_HEIGHT = 18;
 const BUFFER_LINES = 20;
+
+// Pre-compiled regex cache to avoid recompilation on every line render
+const _regexCache = new Map();
+function getFilterRegex(keyword, caseSensitive) {
+  const key = `f|${keyword}|${caseSensitive ? 'c' : 'i'}`;
+  if (!_regexCache.has(key)) {
+    try {
+      _regexCache.set(key, new RegExp(keyword, caseSensitive ? 'g' : 'gi'));
+    } catch {
+      _regexCache.set(key, null);
+    }
+  }
+  return _regexCache.get(key);
+}
+function getRowRegex(keyword, caseSensitive) {
+  const key = `r|${keyword}|${caseSensitive ? 'c' : 'i'}`;
+  if (!_regexCache.has(key)) {
+    try {
+      _regexCache.set(key, new RegExp(keyword, caseSensitive ? '' : 'i'));
+    } catch {
+      _regexCache.set(key, null);
+    }
+  }
+  return _regexCache.get(key);
+}
 
 const LogPanel = forwardRef(function LogPanel({
   lines,
@@ -52,7 +77,8 @@ const LogPanel = forwardRef(function LogPanel({
     },
   }), [lines, containerHeight]);
 
-  // Virtual scroll calculations
+  // Dynamic line number width based on total lines
+  const lineNumWidth = Math.max(50, String(totalLines).length * 9 + 20);
   const totalHeight = lines.length * LINE_HEIGHT;
   const startIdx = Math.max(0, Math.floor(scrollTop / LINE_HEIGHT) - BUFFER_LINES);
   const endIdx = Math.min(lines.length, Math.ceil((scrollTop + containerHeight) / LINE_HEIGHT) + BUFFER_LINES);
@@ -270,7 +296,7 @@ const LogPanel = forwardRef(function LogPanel({
                   className="log-line-number"
                   onClick={() => onToggleBookmark(line.num)}
                   title={isBookmarked ? '取消书签' : '添加书签'}
-                  style={{ cursor: 'pointer', color: isBookmarked ? '#f9e2af' : undefined }}
+                  style={{ cursor: 'pointer', color: isBookmarked ? '#f9e2af' : undefined, minWidth: lineNumWidth }}
                 >
                   {isBookmarked ? <Icons.Star filled /> : line.num}
                   {hasAnnotation && <Icons.Note />}
