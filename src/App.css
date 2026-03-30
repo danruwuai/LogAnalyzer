@@ -143,26 +143,55 @@ body {
 /* Log Panel */
 .log-panel {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   font-family: 'Cascadia Code', 'Consolas', 'Courier New', monospace;
   font-size: 12px;
-  line-height: 20px;
+}
+
+.log-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.log-list {
+  flex: 1;
+  overflow: auto;
+  position: relative;
 }
 
 .log-line {
   display: flex;
   padding: 0 8px;
   cursor: default;
-  border-bottom: 1px solid transparent;
-  min-height: 20px;
-  align-items: stretch;
+  white-space: nowrap;
+  align-items: center;
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .log-line:hover {
   background: var(--bg-secondary) !important;
 }
 
-.log-line-num {
+.log-line.bookmarked {
+  background: rgba(249, 226, 175, 0.06);
+}
+
+.log-line.chart-linked {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.log-line-number {
   color: var(--text-muted);
   text-align: right;
   padding-right: 12px;
@@ -170,57 +199,22 @@ body {
   flex-shrink: 0;
   min-width: 50px;
   font-size: 11px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: flex-end;
-}
-
-.log-line-actions {
-  display: flex;
-  align-items: center;
   gap: 2px;
-  flex-shrink: 0;
-  padding: 0 4px;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.log-line:hover .log-line-actions {
-  opacity: 1;
-}
-
-.log-line-bookmark {
   cursor: pointer;
-  font-size: 10px;
-  color: var(--text-muted);
-  padding: 0 2px;
 }
 
-.log-line-bookmark.active {
+.log-line-number:hover {
   color: var(--yellow);
 }
 
 .log-line-text {
   flex: 1;
-  white-space: pre;
   overflow: hidden;
   text-overflow: ellipsis;
   padding: 0 4px;
-  display: flex;
-  align-items: center;
-}
-
-.log-line-annotation {
-  flex-shrink: 0;
-  font-size: 10px;
-  color: var(--accent);
-  padding: 0 8px;
-  display: flex;
-  align-items: center;
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 /* Context menu */

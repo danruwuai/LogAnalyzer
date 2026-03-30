@@ -52,13 +52,16 @@ function createWindow() {
   ]);
   Menu.setApplicationMenu(menu);
 
-  // Debug log
-  const logPath = path.join(__dirname, 'renderer-debug.log');
-  fs.writeFileSync(logPath, '', 'utf-8');
-  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
-    const levelName = ['verbose', 'info', 'warning', 'error'][level] || 'unknown';
-    fs.appendFileSync(logPath, `[${levelName}] ${message} (${sourceId}:${line})\n`, 'utf-8');
-  });
+  // Debug log (only in dev mode)
+  const isDev = process.argv.includes('--dev') || !app.isPackaged;
+  if (isDev) {
+    const logPath = path.join(__dirname, 'renderer-debug.log');
+    fs.writeFileSync(logPath, '', 'utf-8');
+    mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+      const levelName = ['verbose', 'info', 'warning', 'error'][level] || 'unknown';
+      fs.appendFileSync(logPath, `[${levelName}] ${message} (${sourceId}:${line})\n`, 'utf-8');
+    });
+  }
 
   mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
 

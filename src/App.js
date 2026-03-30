@@ -108,7 +108,7 @@ export default function App() {
     if (!path) return;
     setLoading(true);
     setFilePath(path);
-    setFileName(path.split('\\').pop().split('/').pop());
+    setFileName(path.split(/[/\\]/).pop());
     setLines([]);
     setBookmarks(new Set());
     setAnnotations({});
@@ -222,13 +222,13 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleOpenFile]);
 
-  // Auto-load for demo
+  // Auto-load for demo & menu events
   useEffect(() => {
     if (window.api?.onAutoLoadFile) {
       window.api.onAutoLoadFile(async (filePath) => {
         setLoading(true);
         setFilePath(filePath);
-        setFileName(filePath.split('\\').pop().split('/').pop());
+        setFileName(filePath.split(/[/\\]/).pop());
         setLines([]); setBookmarks(new Set()); setAnnotations({}); setChartLinkedLine(null);
         const result = await window.api.readFull(filePath);
         if (result.success) {
@@ -251,16 +251,24 @@ export default function App() {
         if (config.extractors) setExtractors(config.extractors);
       });
     }
-    // Menu events
-    if (window.api?.onMenuOpenFile) {
-      window.api.onMenuOpenFile(() => handleOpenFile());
-    }
-    if (window.api?.onMenuSwitchTab) {
-      window.api.onMenuSwitchTab((tab) => { setBottomPanel(tab); setShowBottomPanel(true); });
-    }
-    if (window.api?.onMenuHelp) {
-      window.api.onMenuHelp(() => setShowHelp(prev => !prev));
-    }
+    // Menu events - store handler refs for cleanup
+    const menuOpenHandler = () => handleOpenFile();
+    const menuSwitchHandler = (tab) => { setBottomPanel(tab); setShowBottomPanel(true); };
+    const menuHelpHandler = () => setShowHelp(prev => !prev);
+    if (window.api?.onMenuOpenFile) window.api.onMenuOpenFile(menuOpenHandler);
+    if (window.api?.onMenuSwitchTab) window.api.onMenuSwitchTab(menuSwitchHandler);
+    if (window.api?.onMenuHelp) window.api.onMenuHelp(menuHelpHandler);
+
+    return () => {
+      // Clean up ipcRenderer listeners to prevent accumulation
+      if (window.api?.removeAllListeners) {
+        window.api.removeAllListeners('auto-load-file');
+        window.api.removeAllListeners('configure-extractors');
+        window.api.removeAllListeners('menu:openFile');
+        window.api.removeAllListeners('menu:switchTab');
+        window.api.removeAllListeners('menu:help');
+      }
+    };
   }, [handleOpenFile]);
 
   // File drop
@@ -271,7 +279,7 @@ export default function App() {
       (async () => {
         setLoading(true);
         setFilePath(file.path);
-        setFileName(file.path.split('\\').pop().split('/').pop());
+        setFileName(file.path.split(/[/\\]/).pop());
         setLines([]); setBookmarks(new Set()); setAnnotations({}); setChartLinkedLine(null);
         const result = await window.api.readFull(file.path);
         if (result.success) { setLines(result.lines); setTotalLines(result.totalLines); setFileSize(result.fileSize); }

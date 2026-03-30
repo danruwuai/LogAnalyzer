@@ -34,4 +34,7 @@ contextBridge.exposeInMainWorld('api', {
   exportCSV: () => ipcRenderer.invoke('export:csv'),
   saveCSV: (filePath, content) =>
     ipcRenderer.invoke('export:saveCSV', { filePath, content }),
+
+  // Cleanup helper
+  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
 });
