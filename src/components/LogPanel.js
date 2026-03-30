@@ -84,77 +84,108 @@ const LogPanel = forwardRef(function LogPanel({
   const endIdx = Math.min(lines.length, Math.ceil((scrollTop + containerHeight) / LINE_HEIGHT) + BUFFER_LINES);
   const visibleLines = lines.slice(startIdx, endIdx);
 
-  // Highlight text based on filter items
-  const renderText = (text) => {
+  // Pre-compute filter highlights as a lookup map for performance
+  const renderHelpers = useMemo(() => {
     const hasFilters = highlightFilters && highlightFilters.length > 0;
     const hasSearch = searchTerm && searchTerm.length > 0;
-    if (!hasFilters && !hasSearch) return text;
 
-    // Find all matches across all filters AND search term
-    const matches = [];
-    
-    // From filter items
+    // Pre-process filters for renderText
+    const filterDefs = [];
     if (hasFilters) {
       for (const filter of highlightFilters) {
-        try {
-          if (filter.isRegex) {
-            const regex = new RegExp(filter.keyword, filter.caseSensitive ? 'g' : 'gi');
-            let match;
-            while ((match = regex.exec(text)) !== null) {
-              matches.push({
-                start: match.index, end: match.index + match[0].length,
-                text: match[0], bgColor: filter.bgColor, fgColor: filter.fgColor,
-                fontColor: filter.fontColor || '', priority: 1,
-              });
-            }
-          } else {
-            const searchText = filter.caseSensitive ? text : text.toLowerCase();
-            const searchKeyword = filter.caseSensitive ? filter.keyword : filter.keyword.toLowerCase();
-            let idx = 0;
-            while ((idx = searchText.indexOf(searchKeyword, idx)) !== -1) {
-              matches.push({
-                start: idx, end: idx + filter.keyword.length,
-                text: text.substring(idx, idx + filter.keyword.length),
-                bgColor: filter.bgColor, fgColor: filter.fgColor,
-                fontColor: filter.fontColor || '', priority: 1,
-              });
-              idx += filter.keyword.length;
-            }
-          }
-        } catch { /* invalid regex */ }
+        if (filter.isRegex) {
+          const regex = getFilterRegex(filter.keyword, filter.caseSensitive);
+          if (regex) filterDefs.push({ type: 'regex', regex, bgColor: filter.bgColor, fgColor: filter.fgColor, fontColor: filter.fontColor || '' });
+        } else {
+          filterDefs.push({ type: 'text', keyword: filter.keyword, caseSensitive: filter.caseSensitive, bgColor: filter.bgColor, fgColor: filter.fgColor, fontColor: filter.fontColor || '' });
+        }
       }
     }
-    
-    // From search term (lower priority, yellow highlight)
-    if (hasSearch) {
-      try {
-        const searchText = text.toLowerCase();
-        const term = searchTerm.toLowerCase();
-        let idx = 0;
-        while ((idx = searchText.indexOf(term, idx)) !== -1) {
-          matches.push({
-            start: idx, end: idx + searchTerm.length,
-            text: text.substring(idx, idx + searchTerm.length),
-            bgColor: 'rgba(249, 226, 175, 0.3)', fgColor: '#f9e2af',
-            fontColor: '', priority: 0,
-          });
-          idx += searchTerm.length;
+
+    // Pre-process filters for row highlight
+    const rowHighlightDefs = [];
+    if (hasFilters) {
+      for (const filter of highlightFilters) {
+        if (!filter.highlightRow) continue;
+        if (filter.isRegex) {
+          const regex = getRowRegex(filter.keyword, filter.caseSensitive);
+          if (regex) rowHighlightDefs.push({ type: 'regex', regex, bgColor: filter.bgColor });
+        } else {
+          rowHighlightDefs.push({ type: 'text', keyword: filter.keyword, caseSensitive: filter.caseSensitive, bgColor: filter.bgColor });
         }
-      } catch {}
+      }
     }
 
-    // Sort matches by start position, then by priority (higher first)
+    return { hasFilters, hasSearch, filterDefs, rowHighlightDefs, searchTermLower: hasSearch ? searchTerm.toLowerCase() : '' };
+  }, [highlightFilters, searchTerm]);
+
+  // Highlight text - uses pre-compiled regexes from renderHelpers
+  const renderText = useCallback((text) => {
+    const { hasFilters, hasSearch, filterDefs, searchTermLower } = renderHelpers;
+    if (!hasFilters && !hasSearch) return text;
+
+    const matches = [];
+
+    // From filter items
+    if (hasFilters) {
+      for (const fd of filterDefs) {
+        if (fd.type === 'regex') {
+          fd.regex.lastIndex = 0;
+          let match;
+          while ((match = fd.regex.exec(text)) !== null) {
+            matches.push({
+              start: match.index, end: match.index + match[0].length,
+              text: match[0], bgColor: fd.bgColor, fgColor: fd.fgColor,
+              fontColor: fd.fontColor, priority: 1,
+            });
+            if (!fd.regex.global) break;
+          }
+        } else {
+          const searchText = fd.caseSensitive ? text : text.toLowerCase();
+          const searchKeyword = fd.caseSensitive ? fd.keyword : fd.keyword.toLowerCase();
+          let idx = 0;
+          while ((idx = searchText.indexOf(searchKeyword, idx)) !== -1) {
+            matches.push({
+              start: idx, end: idx + fd.keyword.length,
+              text: text.substring(idx, idx + fd.keyword.length),
+              bgColor: fd.bgColor, fgColor: fd.fgColor,
+              fontColor: fd.fontColor, priority: 1,
+            });
+            idx += fd.keyword.length;
+          }
+        }
+      }
+    }
+
+    // From search term (lower priority, yellow highlight)
+    if (hasSearch) {
+      const searchText = text.toLowerCase();
+      const term = searchTermLower;
+      let idx = 0;
+      while ((idx = searchText.indexOf(term, idx)) !== -1) {
+        matches.push({
+          start: idx, end: idx + term.length,
+          text: text.substring(idx, idx + term.length),
+          bgColor: 'rgba(249, 226, 175, 0.3)', fgColor: '#f9e2af',
+          fontColor: '', priority: 0,
+        });
+        idx += term.length;
+      }
+    }
+
+    if (matches.length === 0) return text;
+
+    // Sort by start position, then by priority (higher first)
     matches.sort((a, b) => a.start - b.start || b.priority - a.priority);
 
     // Merge overlapping matches - higher priority wins
     const merged = [];
     for (const match of matches) {
       if (merged.length === 0 || match.start >= merged[merged.length - 1].end) {
-        merged.push(match);
+        merged.push({ ...match });
       } else {
         const last = merged[merged.length - 1];
         if (match.priority >= last.priority) {
-          // Higher or equal priority: extend or override
           last.end = Math.max(last.end, match.end);
           if (match.priority > last.priority) {
             last.bgColor = match.bgColor;
@@ -162,7 +193,6 @@ const LogPanel = forwardRef(function LogPanel({
             last.fontColor = match.fontColor;
           }
         } else {
-          // Lower priority: keep existing
           last.end = Math.max(last.end, match.end);
         }
       }
@@ -176,53 +206,38 @@ const LogPanel = forwardRef(function LogPanel({
         result.push(text.substring(lastIndex, match.start));
       }
       result.push(
-        <span
-          key={match.start}
-          style={{
-            backgroundColor: match.bgColor,
-            color: match.fontColor || match.fgColor,
-            padding: '0 2px',
-            borderRadius: 2,
-            fontWeight: 600,
-          }}
-        >
+        <span key={match.start} style={{
+          backgroundColor: match.bgColor, color: match.fontColor || match.fgColor,
+          padding: '0 2px', borderRadius: 2, fontWeight: 600,
+        }}>
           {match.text}
         </span>
       );
       lastIndex = match.end;
     }
-    
     if (lastIndex < text.length) {
       result.push(text.substring(lastIndex));
     }
+    return result;
+  }, [renderHelpers]);
 
-    return result.length > 0 ? result : text;
-  };
-
-  // Check if a line matches any highlightRow filter
-  const getRowHighlight = (text) => {
-    if (!highlightFilters || highlightFilters.length === 0) return null;
-    for (const filter of highlightFilters) {
-      if (!filter.highlightRow) continue;
-      try {
-        let matched = false;
-        if (filter.isRegex) {
-          const regex = new RegExp(filter.keyword, filter.caseSensitive ? '' : 'i');
-          matched = regex.test(text);
-        } else {
-          if (filter.caseSensitive) {
-            matched = text.includes(filter.keyword);
-          } else {
-            matched = text.toLowerCase().includes(filter.keyword.toLowerCase());
-          }
-        }
-        if (matched) {
-          return { backgroundColor: filter.bgColor };
-        }
-      } catch { /* invalid regex */ }
+  // Row highlight check - uses pre-compiled regexes
+  const getRowHighlight = useCallback((text) => {
+    const { rowHighlightDefs } = renderHelpers;
+    if (rowHighlightDefs.length === 0) return null;
+    for (const def of rowHighlightDefs) {
+      if (def.type === 'regex') {
+        def.regex.lastIndex = 0;
+        if (def.regex.test(text)) return { backgroundColor: def.bgColor };
+      } else {
+        const matched = def.caseSensitive
+          ? text.includes(def.keyword)
+          : text.toLowerCase().includes(def.keyword.toLowerCase());
+        if (matched) return { backgroundColor: def.bgColor };
+      }
     }
     return null;
-  };
+  }, [renderHelpers]);
 
   // Context menu
   const handleContextMenu = (e, lineNum) => {
