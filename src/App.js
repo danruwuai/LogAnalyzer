@@ -542,7 +542,17 @@ function ChartPanelInline({ lines, extractors, onAddExtractor, onUpdateExtractor
       let hasData = false;
       for (const r of regexes) {
         const match = line.text.match(r.regex);
-        if (match && match[1]) { const val = parseFloat(match[1]); if (!isNaN(val)) { point[r.name] = val; hasData = true; } }
+        if (match) {
+          // Support multiple capture groups
+          for (let g = 1; g < match.length; g++) {
+            const val = parseFloat(match[g]);
+            if (!isNaN(val)) {
+              const key = match.length > 2 ? `${r.name}_g${g}` : r.name;
+              point[key] = val;
+              hasData = true;
+            }
+          }
+        }
       }
       if (hasData) results.push(point);
     }
@@ -589,6 +599,27 @@ function ChartPanelInline({ lines, extractors, onAddExtractor, onUpdateExtractor
         {xAxisMode === 'data' && <input className="toolbar-input" style={{ width: 100 }} placeholder="字段名" value={xAxisField} onChange={e => onXAxisFieldChange(e.target.value)} />}
         <button className="toolbar-btn small" onClick={onAddExtractor}>+ 指标</button>
       </div>
+      {/* Stats summary */}
+      {chartData && chartData.length > 0 && (
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 4, fontSize: 11 }}>
+          {extractors.filter(e => e.name !== 'seqNum' && e.name !== 'isConverge').map(ext => {
+            const vals = chartData.map(d => d[ext.name]).filter(v => v != null && !isNaN(v));
+            if (vals.length === 0) return null;
+            const min = Math.min(...vals).toFixed(2);
+            const max = Math.max(...vals).toFixed(2);
+            const avg = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
+            return (
+              <div key={ext.name} style={{ background: '#181825', padding: '2px 8px', borderRadius: 4, borderLeft: `3px solid ${ext.color}` }}>
+                <span style={{ color: ext.color, fontWeight: 600 }}>{ext.name}</span>
+                <span style={{ color: '#6c7086', marginLeft: 6 }}>min:{min}</span>
+                <span style={{ color: '#6c7086' }}> max:{max}</span>
+                <span style={{ color: '#6c7086' }}> avg:{avg}</span>
+                <span style={{ color: '#6c7086' }}> n:{vals.length}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
       <div ref={chartRef} style={{ width: '100%', height: 200, minHeight: 200, position: 'relative' }} />
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
         {extractors.map((ext, i) => (
