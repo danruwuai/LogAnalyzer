@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const readline = require('readline');
@@ -12,7 +12,7 @@ function createWindow() {
     minWidth: 1000,
     minHeight: 600,
     title: 'LogAnalyzer',
-    show: true,
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -20,14 +20,43 @@ function createWindow() {
     },
   });
 
-  // Open DevTools in development to capture errors
-  mainWindow.webContents.openDevTools({ mode: 'detach' });
+  // Menu
+  const menu = Menu.buildFromTemplate([
+    {
+      label: '文件',
+      submenu: [
+        { label: '打开文件', accelerator: 'CmdOrCtrl+O', click: () => mainWindow.webContents.send('menu:openFile') },
+        { type: 'separator' },
+        { label: '退出', accelerator: 'Alt+F4', click: () => app.quit() },
+      ],
+    },
+    {
+      label: '视图',
+      submenu: [
+        { label: '筛选面板', accelerator: 'CmdOrCtrl+1', click: () => mainWindow.webContents.send('menu:switchTab', 'filter') },
+        { label: '图表', accelerator: 'CmdOrCtrl+2', click: () => mainWindow.webContents.send('menu:switchTab', 'chart') },
+        { label: '注释', accelerator: 'CmdOrCtrl+3', click: () => mainWindow.webContents.send('menu:switchTab', 'annotations') },
+        { label: '配置', accelerator: 'CmdOrCtrl+4', click: () => mainWindow.webContents.send('menu:switchTab', 'config') },
+        { type: 'separator' },
+        { label: '开发者工具', accelerator: 'F12', click: () => mainWindow.webContents.toggleDevTools() },
+      ],
+    },
+    {
+      label: '帮助',
+      submenu: [
+        { label: '快捷键', accelerator: 'F1', click: () => mainWindow.webContents.send('menu:help') },
+        { type: 'separator' },
+        { label: '关于', click: () => dialog.showMessageBox(mainWindow, { title: 'LogAnalyzer', message: 'LogAnalyzer v1.0\n基于 Electron + React + ECharts', type: 'info' }) },
+      ],
+    },
+  ]);
+  Menu.setApplicationMenu(menu);
 
-  // Log console messages to file for debugging
+  // Debug log
   const logPath = path.join(__dirname, 'renderer-debug.log');
-  fs.writeFileSync(logPath, '', 'utf-8'); // Clear old log
+  fs.writeFileSync(logPath, '', 'utf-8');
   mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
-    const levelName = ['verbose','info','warning','error'][level] || 'unknown';
+    const levelName = ['verbose', 'info', 'warning', 'error'][level] || 'unknown';
     fs.appendFileSync(logPath, `[${levelName}] ${message} (${sourceId}:${line})\n`, 'utf-8');
   });
 
@@ -35,14 +64,12 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    
-    // Auto-load isp_log.txt
+
+    // Auto-load demo if available
     const ispLogPath = path.join(__dirname, 'isp_log.txt');
     if (fs.existsSync(ispLogPath)) {
       setTimeout(() => {
         mainWindow.webContents.send('auto-load-file', ispLogPath);
-        
-        // Configure extractors
         setTimeout(() => {
           mainWindow.webContents.send('configure-extractors', {
             xAxisMode: 'data',
@@ -54,7 +81,7 @@ function createWindow() {
               { name: 'objectMeanLuma', regex: 'objectMeanLuma\\s*=\\s*([\\d.]+)', color: '#f9e2af' },
               { name: 'cur_luma', regex: 'cur_luma\\s*=\\s*([\\d.]+)', color: '#f38ba8' },
               { name: 'isConverge', regex: 'isConverge=(\\d+)', color: '#fab387' },
-            ]
+            ],
           });
         }, 1000);
       }, 500);
@@ -82,7 +109,6 @@ app.on('activate', () => {
 
 // --- IPC Handlers ---
 
-// Open file dialog
 ipcMain.handle('dialog:openFile', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile'],
@@ -95,35 +121,41 @@ ipcMain.handle('dialog:openFile', async () => {
   return result.filePaths[0];
 });
 
-// Read file stream - returns chunks of lines
+// Open multiple files
+ipcMain.handle('dialog:openFiles', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: 'Log Files', extensions: ['log', 'txt', 'csv', 'json'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+  });
+  if (result.canceled) return null;
+  return result.filePaths;
+});
+
 ipcMain.handle('file:readStream', async (event, filePath) => {
   try {
     const stat = fs.statSync(filePath);
     const fileSize = stat.size;
-
     const rl = readline.createInterface({
       input: fs.createReadStream(filePath, { encoding: 'utf-8' }),
       crlfDelay: Infinity,
     });
-
     let lineNum = 0;
     const CHUNK_SIZE = 500;
     let chunk = [];
-
     for await (const line of rl) {
       lineNum++;
       chunk.push({ num: lineNum, text: line });
-
       if (chunk.length >= CHUNK_SIZE) {
         event.sender.send('file:chunk', { lines: chunk, totalLines: lineNum, fileSize });
         chunk = [];
       }
     }
-
     if (chunk.length > 0) {
       event.sender.send('file:chunk', { lines: chunk, totalLines: lineNum, fileSize });
     }
-
     event.sender.send('file:done', { totalLines: lineNum, fileSize, filePath });
     return { success: true };
   } catch (err) {
@@ -131,7 +163,6 @@ ipcMain.handle('file:readStream', async (event, filePath) => {
   }
 });
 
-// Read file fully (for smaller files)
 ipcMain.handle('file:readFull', async (_, filePath) => {
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
@@ -143,7 +174,6 @@ ipcMain.handle('file:readFull', async (_, filePath) => {
   }
 });
 
-// Save annotations
 ipcMain.handle('annotations:save', async (_, { filePath, annotations }) => {
   try {
     const annoPath = filePath + '.annotations.json';
@@ -154,7 +184,6 @@ ipcMain.handle('annotations:save', async (_, { filePath, annotations }) => {
   }
 });
 
-// Load annotations
 ipcMain.handle('annotations:load', async (_, filePath) => {
   try {
     const annoPath = filePath + '.annotations.json';
@@ -168,7 +197,6 @@ ipcMain.handle('annotations:load', async (_, filePath) => {
   }
 });
 
-// Save chart as image (handled in renderer, this is for file save)
 ipcMain.handle('chart:saveImage', async () => {
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: 'chart.png',
@@ -181,7 +209,6 @@ ipcMain.handle('chart:saveImage', async () => {
   return result.filePath;
 });
 
-// Export CSV
 ipcMain.handle('export:csv', async () => {
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: 'data.csv',

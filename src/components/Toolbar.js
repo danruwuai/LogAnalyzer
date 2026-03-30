@@ -8,6 +8,8 @@ export default function Toolbar({
   onSearch,
   loading,
   fileName,
+  searchMatchCount,
+  onJumpToLine,
 }) {
   const handleSearchKey = (e) => {
     if (e.key === 'Enter') onSearch();
@@ -26,7 +28,15 @@ export default function Toolbar({
           value={searchTerm}
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={handleSearchKey} />
+        {searchTerm && searchMatchCount > 0 && (
+          <span style={{ fontSize: 11, color: '#a6e3a1', whiteSpace: 'nowrap', padding: '0 6px' }}>
+            {searchMatchCount} 匹配
+          </span>
+        )}
       </div>
+      <button className="toolbar-btn" onClick={onJumpToLine} title="跳转到行 (Ctrl+G)">
+        ↦ 行号
+      </button>
       {fileName && <span className="file-info"><Icons.File /> {fileName}</span>}
     </div>
   );

@@ -197,16 +197,21 @@ export default function App() {
     setChartLinkedLine(lineNum);
   }, []);
 
+  const [searchMatchCount, setSearchMatchCount] = useState(0);
+  const [showJumpToLine, setShowJumpToLine] = useState(false);
+  const [jumpLineNum, setJumpLineNum] = useState('');
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.ctrlKey && e.key === 'o') { e.preventDefault(); handleOpenFile(); }
       if (e.ctrlKey && e.key === 'f') { e.preventDefault(); document.querySelector('.toolbar-input')?.focus(); }
-      if (e.key === 'Escape') { setSearchTerm(''); document.activeElement?.blur(); }
+      if (e.key === 'Escape') { setSearchTerm(''); setShowJumpToLine(false); document.activeElement?.blur(); }
       if (e.ctrlKey && e.key === '1') { e.preventDefault(); setBottomPanel('filter'); setShowBottomPanel(true); }
       if (e.ctrlKey && e.key === '2') { e.preventDefault(); setBottomPanel('chart'); setShowBottomPanel(true); }
       if (e.ctrlKey && e.key === '3') { e.preventDefault(); setBottomPanel('annotations'); setShowBottomPanel(true); }
       if (e.ctrlKey && e.key === '4') { e.preventDefault(); setBottomPanel('config'); setShowBottomPanel(true); }
+      if (e.ctrlKey && e.key === 'g') { e.preventDefault(); setShowJumpToLine(true); }
       if (e.ctrlKey && e.shiftKey && e.key === 'F') { e.preventDefault(); setFilterMode(prev => prev === 'filter' ? 'show-all' : 'filter'); }
       if (e.ctrlKey && e.shiftKey && e.key === 'C') { e.preventDefault(); setFilterItems([]); }
       if (e.key === 'F1') { e.preventDefault(); setShowHelp(prev => !prev); }
@@ -245,7 +250,17 @@ export default function App() {
         if (config.extractors) setExtractors(config.extractors);
       });
     }
-  }, []);
+    // Menu events
+    if (window.api?.onMenuOpenFile) {
+      window.api.onMenuOpenFile(() => handleOpenFile());
+    }
+    if (window.api?.onMenuSwitchTab) {
+      window.api.onMenuSwitchTab((tab) => { setBottomPanel(tab); setShowBottomPanel(true); });
+    }
+    if (window.api?.onMenuHelp) {
+      window.api.onMenuHelp(() => setShowHelp(prev => !prev));
+    }
+  }, [handleOpenFile]);
 
   // File drop
   const handleDrop = useCallback((e) => {
@@ -307,7 +322,49 @@ export default function App() {
         }}
         loading={loading}
         fileName={fileName}
+        searchMatchCount={searchTerm ? filteredLines.filter(l => l.text.toLowerCase().includes(searchTerm.toLowerCase())).length : 0}
+        onJumpToLine={() => setShowJumpToLine(true)}
       />
+
+      {/* Jump to line dialog */}
+      {showJumpToLine && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(0,0,0,0.5)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 2000,
+        }} onClick={() => setShowJumpToLine(false)}>
+          <div style={{
+            background: '#1e1e2e', border: '1px solid #45475a',
+            borderRadius: 8, padding: 16, width: 300,
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ marginBottom: 8, color: '#a6adc8', fontSize: 13 }}>跳转到行号:</div>
+            <input
+              autoFocus
+              style={{
+                width: '100%', padding: '8px 10px', border: '1px solid #45475a',
+                borderRadius: 6, background: '#313244', color: '#cdd6f4',
+                fontSize: 14, outline: 'none', boxSizing: 'border-box',
+              }}
+              value={jumpLineNum}
+              onChange={e => setJumpLineNum(e.target.value.replace(/\D/g, ''))}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && jumpLineNum) {
+                  jumpToLine(parseInt(jumpLineNum));
+                  setShowJumpToLine(false);
+                  setJumpLineNum('');
+                }
+              }}
+              placeholder={`1 - ${totalLines}`}
+            />
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
+              <button className="toolbar-btn" onClick={() => { setShowJumpToLine(false); setJumpLineNum(''); }}>取消</button>
+              <button className="toolbar-btn" onClick={() => {
+                if (jumpLineNum) { jumpToLine(parseInt(jumpLineNum)); setShowJumpToLine(false); setJumpLineNum(''); }
+              }} style={{ background: '#89b4fa', color: '#1e1e2e' }}>跳转</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading && <div className="loading-bar"><div className="loading-bar-inner" /></div>}
 
@@ -404,7 +461,8 @@ export default function App() {
             <div className="help-overlay-body">
               <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>O</kbd><span>打开文件</span></div>
               <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>F</kbd><span>聚焦搜索框</span></div>
-              <div className="help-shortcut"><kbd>Esc</kbd><span>清除搜索</span></div>
+              <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>G</kbd><span>跳转到行号</span></div>
+              <div className="help-shortcut"><kbd>Esc</kbd><span>清除搜索/关闭对话框</span></div>
               <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>1-4</kbd><span>切换底部标签</span></div>
               <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd><span>切换过滤/全显</span></div>
               <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd><span>清空筛选条件</span></div>
