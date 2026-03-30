@@ -143,7 +143,7 @@ ipcMain.handle('dialog:openFiles', async () => {
 
 ipcMain.handle('file:readStream', async (event, filePath) => {
   try {
-    const stat = fs.statSync(filePath);
+    const stat = await fs.promises.stat(filePath);
     const fileSize = stat.size;
     const rl = readline.createInterface({
       input: fs.createReadStream(filePath, { encoding: 'utf-8' }),
@@ -172,12 +172,12 @@ ipcMain.handle('file:readStream', async (event, filePath) => {
 
 ipcMain.handle('file:readFull', async (_, filePath) => {
   try {
-    const stat = fs.statSync(filePath);
-    const MAX_SIZE = 50 * 1024 * 1024; // 50MB limit for sync read
+    const stat = await fs.promises.stat(filePath);
+    const MAX_SIZE = 50 * 1024 * 1024; // 50MB limit
     if (stat.size > MAX_SIZE) {
       return { success: false, error: `文件过大 (${(stat.size / 1024 / 1024).toFixed(1)}MB)，请使用流式加载或选择小于 50MB 的文件` };
     }
-    const content = fs.readFileSync(filePath, 'utf-8');
+    const content = await fs.promises.readFile(filePath, 'utf-8');
     const lines = content.split('\n').map((text, i) => ({ num: i + 1, text }));
     return { success: true, lines, totalLines: lines.length, fileSize: stat.size, filePath };
   } catch (err) {
@@ -188,7 +188,7 @@ ipcMain.handle('file:readFull', async (_, filePath) => {
 ipcMain.handle('annotations:save', async (_, { filePath, annotations }) => {
   try {
     const annoPath = filePath + '.annotations.json';
-    fs.writeFileSync(annoPath, JSON.stringify(annotations, null, 2), 'utf-8');
+    await fs.promises.writeFile(annoPath, JSON.stringify(annotations, null, 2), 'utf-8');
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
@@ -198,9 +198,14 @@ ipcMain.handle('annotations:save', async (_, { filePath, annotations }) => {
 ipcMain.handle('annotations:load', async (_, filePath) => {
   try {
     const annoPath = filePath + '.annotations.json';
-    if (fs.existsSync(annoPath)) {
-      const data = fs.readFileSync(annoPath, 'utf-8');
-      return { success: true, annotations: JSON.parse(data) };
+    const exists = await fs.promises.access(annoPath).then(() => true).catch(() => false);
+    if (exists) {
+      const data = await fs.promises.readFile(annoPath, 'utf-8');
+      try {
+        return { success: true, annotations: JSON.parse(data) };
+      } catch {
+        return { success: true, annotations: {}, parseWarning: '注释文件格式已损坏，已重置' };
+      }
     }
     return { success: true, annotations: {} };
   } catch (err) {
