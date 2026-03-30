@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import * as echarts from 'echarts';
 import Toolbar from './components/Toolbar';
 import LogPanel from './components/LogPanel';
 import StatusBar from './components/StatusBar';
@@ -550,13 +551,10 @@ function ChartPanelInline({ lines, extractors, onAddExtractor, onUpdateExtractor
 
   useEffect(() => {
     if (!chartRef.current) return;
-    // echarts is exposed via preload as window.echarts
-    const echarts = window.echarts;
-    if (!echarts) { console.error('echarts not available'); return; }
     if (!chartInstance.current) {
       chartInstance.current = echarts.init(chartRef.current, null, { renderer: 'canvas' });
     }
-    if (!chartData || chartData.length === 0) { chart.clear(); return; }
+    if (!chartData || chartData.length === 0) { chartInstance.current.clear(); return; }
 
     const metricNames = extractors.map(e => e.name).filter(n => n !== 'seqNum' && n !== 'isConverge');
     const xData = xAxisMode === 'data' ? chartData.map(d => d[xAxisField] ?? d.lineNum) : chartData.map(d => d.lineNum);
@@ -566,7 +564,7 @@ function ChartPanelInline({ lines, extractors, onAddExtractor, onUpdateExtractor
       lineStyle: { width: 2 }, itemStyle: { color: extractors.find(e => e.name === name)?.color || '#89b4fa' },
     }));
 
-    chart.setOption({
+    chartInstance.current.setOption({
       backgroundColor: 'transparent',
       tooltip: { trigger: 'axis', backgroundColor: '#1e1e2e', borderColor: '#45475a', textStyle: { color: '#cdd6f4' } },
       legend: { data: metricNames, top: 0, textStyle: { color: '#a6adc8', fontSize: 11 } },
@@ -577,8 +575,9 @@ function ChartPanelInline({ lines, extractors, onAddExtractor, onUpdateExtractor
       dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 0, height: 16 }],
     }, true);
 
-    setTimeout(() => chart.resize(), 50);
-    return () => { window.removeEventListener('resize', () => chart.resize()); };
+    const handleResize = () => chartInstance.current?.resize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [chartData, extractors, xAxisMode, xAxisField]);
 
   return (
