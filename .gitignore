@@ -1,0 +1,15 @@
+node_modules/
+dist/
+*.log
+*.map
+*.png
+test-window.js
+demo.html
+test-chart.html
+capture-app.ps1
+capture-isp-log.js
+find-browser.bat
+take-demo-screenshot.ps1
+take-screenshot.js
+take-screenshot.ps1
+wait-and-screenshot.js
