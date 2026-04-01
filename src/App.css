@@ -415,3 +415,22 @@ body {
   height: 14px;
   flex-shrink: 0;
 }
+
+/* Draggable Panel */
+.panel-title-btn:hover {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-primary) !important;
+}
+
+.draggable-panel.dragging {
+  opacity: 0.92;
+}
+
+.draggable-panel.maximized {
+  animation: panel-maximize 0.15s ease-out;
+}
+
+@keyframes panel-maximize {
+  from { transform: scale(0.95); opacity: 0.8; }
+  to { transform: scale(1); opacity: 1; }
+}

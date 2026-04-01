@@ -3,6 +3,7 @@ import * as echarts from 'echarts';
 import Toolbar from './components/Toolbar';
 import LogPanel from './components/LogPanel';
 import StatusBar from './components/StatusBar';
+import DraggablePanel from './components/DraggablePanel';
 import { Icons } from './components/Icons';
 
 const COLORS = ['#89b4fa', '#a6e3a1', '#f9e2af', '#f38ba8', '#fab387', '#cba6f7', '#94e2d5'];
@@ -54,6 +55,22 @@ export default function App() {
   const [bottomPanel, setBottomPanel] = useState('filter');
   const [showBottomPanel, setShowBottomPanel] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
+
+  // Panel maximize & z-index state
+  const [maximizedPanel, setMaximizedPanel] = useState(null); // null | 'log' | 'bottom'
+  const [panelZIndex, setPanelZIndex] = useState({ log: 10, bottom: 10 });
+  const topZRef = useRef(10);
+
+  const handleMaximize = useCallback((panelId) => {
+    setMaximizedPanel(panelId);
+  }, []);
+  const handleRestore = useCallback(() => {
+    setMaximizedPanel(null);
+  }, []);
+  const handleBringToFront = useCallback((panelId) => {
+    topZRef.current += 1;
+    setPanelZIndex(prev => ({ ...prev, [panelId]: topZRef.current }));
+  }, []);
 
   // Saved profiles (unified: filters + extractors + thresholds)
   const [profiles, setProfiles] = useState(() => {
@@ -393,66 +410,90 @@ export default function App() {
         <ErrorBoundary>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Log panel - takes most space */}
-          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-            <LogPanel
-              ref={logPanelRef}
-              lines={filteredLines}
-              totalLines={totalLines}
-              highlightFilters={activeHighlightFilters}
-              bookmarks={bookmarks}
-              annotations={annotations}
-              chartLinkedLine={chartLinkedLine}
-              onToggleBookmark={toggleBookmark}
-              onAddAnnotation={addAnnotation}
-              onJumpToLine={jumpToLine}
-              searchTerm={searchTerm}
-              filterMode={filterMode}
-            />
-          </div>
-
-          {/* Bottom panel toggle */}
-          <div className="bottom-panel-toggle">
-            <div className="bottom-panel-tabs">
-              {['filter', 'chart', 'annotations', 'config'].map(tab => (
-                <button key={tab}
-                  className={`bottom-panel-tab ${bottomPanel === tab ? 'active' : ''}`}
-                  onClick={() => { setBottomPanel(tab); setShowBottomPanel(true); }}>
-                  {tab === 'filter' && <><Icons.Filter /> 筛选 ({filterItems.length})</>}
-                  {tab === 'chart' && <><Icons.Chart /> 图表 ({extractors.length})</>}
-                  {tab === 'annotations' && <><Icons.NoteList /> 注释 ({Object.keys(annotations).length})</>}
-                  {tab === 'config' && <><Icons.Gear /> 配置</>}
-                </button>
-              ))}
-              <button className="bottom-panel-tab" onClick={() => setShowBottomPanel(p => !p)}>
-                {showBottomPanel ? '▼' : '▲'}
-              </button>
+          {maximizedPanel !== 'bottom' && (
+            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+              <DraggablePanel
+                title={`日志 ${filteredLines.length > 0 ? `(${filteredLines.length}行)` : ''}`}
+                icon={<Icons.File />}
+                panelId="log"
+                isMaximized={maximizedPanel === 'log'}
+                onMaximize={handleMaximize}
+                onRestore={handleRestore}
+                zIndex={panelZIndex.log}
+                onZIndexRequest={() => handleBringToFront('log')}
+              >
+                <LogPanel
+                  ref={logPanelRef}
+                  lines={filteredLines}
+                  totalLines={totalLines}
+                  highlightFilters={activeHighlightFilters}
+                  bookmarks={bookmarks}
+                  annotations={annotations}
+                  chartLinkedLine={chartLinkedLine}
+                  onToggleBookmark={toggleBookmark}
+                  onAddAnnotation={addAnnotation}
+                  onJumpToLine={jumpToLine}
+                  searchTerm={searchTerm}
+                  filterMode={filterMode}
+                />
+              </DraggablePanel>
             </div>
-          </div>
+          )}
 
-          {/* Bottom panel content */}
-          {showBottomPanel && (
-            <div className="bottom-panel-content">
-              <ErrorBoundary>
-                {bottomPanel === 'filter' && <FilterPanelInline
-                  filterItems={filterItems} onFilterItemsChange={setFilterItems}
-                  filterMode={filterMode} onFilterModeChange={setFilterMode}
-                />}
-                {bottomPanel === 'chart' && <ChartPanelInline
-                  lines={lines} extractors={extractors}
-                  onAddExtractor={addExtractor} onUpdateExtractor={updateExtractor} onRemoveExtractor={removeExtractor}
-                  xAxisMode={xAxisMode} onXAxisModeChange={setXAxisMode}
-                  xAxisField={xAxisField} onXAxisFieldChange={setXAxisField}
-                  thresholds={thresholds} onAddThreshold={addThreshold} onUpdateThreshold={updateThreshold} onRemoveThreshold={removeThreshold}
-                  annotations={annotations} onJumpToLine={jumpToLine} chartLinkedLine={chartLinkedLine}
-                />}
-                {bottomPanel === 'annotations' && <AnnotationsPanelInline
-                  annotations={annotations} onRemoveAnnotation={removeAnnotation} onJumpToLine={jumpToLine}
-                />}
-                {bottomPanel === 'config' && <ConfigPanelInline
-                  profiles={profiles} onSaveProfile={saveProfile} onLoadProfile={loadProfile} onDeleteProfile={deleteProfile}
-                  filterItems={filterItems} extractors={extractors}
-                />}
-              </ErrorBoundary>
+          {/* Bottom panel (tabs + content wrapped together) */}
+          {maximizedPanel !== 'log' && (
+            <div style={{ flexShrink: 0 }}>
+              <DraggablePanel
+                title={
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {['filter', 'chart', 'annotations', 'config'].map(tab => (
+                      <button key={tab}
+                        className={`bottom-panel-tab ${bottomPanel === tab ? 'active' : ''}`}
+                        onClick={() => { setBottomPanel(tab); setShowBottomPanel(true); }}
+                        style={{ padding: '2px 10px' }}>
+                        {tab === 'filter' && <><Icons.Filter /> 筛选 ({filterItems.length})</>}
+                        {tab === 'chart' && <><Icons.Chart /> 图表 ({extractors.length})</>}
+                        {tab === 'annotations' && <><Icons.NoteList /> 注释 ({Object.keys(annotations).length})</>}
+                        {tab === 'config' && <><Icons.Gear /> 配置</>}
+                      </button>
+                    ))}
+                    <button className="bottom-panel-tab" onClick={() => setShowBottomPanel(p => !p)} style={{ padding: '2px 8px' }}>
+                      {showBottomPanel ? '▼' : '▲'}
+                    </button>
+                  </span>
+                }
+                panelId="bottom"
+                isMaximized={maximizedPanel === 'bottom'}
+                onMaximize={handleMaximize}
+                onRestore={handleRestore}
+                zIndex={panelZIndex.bottom}
+                onZIndexRequest={() => handleBringToFront('bottom')}
+                contentStyle={{ maxHeight: showBottomPanel ? 280 : 0, overflow: 'auto', padding: showBottomPanel ? '8px 12px' : 0, transition: 'max-height 0.2s' }}
+              >
+                {showBottomPanel && (
+                  <ErrorBoundary>
+                    {bottomPanel === 'filter' && <FilterPanelInline
+                      filterItems={filterItems} onFilterItemsChange={setFilterItems}
+                      filterMode={filterMode} onFilterModeChange={setFilterMode}
+                    />}
+                    {bottomPanel === 'chart' && <ChartPanelInline
+                      lines={lines} extractors={extractors}
+                      onAddExtractor={addExtractor} onUpdateExtractor={updateExtractor} onRemoveExtractor={removeExtractor}
+                      xAxisMode={xAxisMode} onXAxisModeChange={setXAxisMode}
+                      xAxisField={xAxisField} onXAxisFieldChange={setXAxisField}
+                      thresholds={thresholds} onAddThreshold={addThreshold} onUpdateThreshold={updateThreshold} onRemoveThreshold={removeThreshold}
+                      annotations={annotations} onJumpToLine={jumpToLine} chartLinkedLine={chartLinkedLine}
+                    />}
+                    {bottomPanel === 'annotations' && <AnnotationsPanelInline
+                      annotations={annotations} onRemoveAnnotation={removeAnnotation} onJumpToLine={jumpToLine}
+                    />}
+                    {bottomPanel === 'config' && <ConfigPanelInline
+                      profiles={profiles} onSaveProfile={saveProfile} onLoadProfile={loadProfile} onDeleteProfile={deleteProfile}
+                      filterItems={filterItems} extractors={extractors}
+                    />}
+                  </ErrorBoundary>
+                )}
+              </DraggablePanel>
             </div>
           )}
         </div>
