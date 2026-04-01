@@ -175,7 +175,10 @@ export default function App() {
     return result;
   }, [lines, filterItems, filterMode]);
 
-  const activeHighlightFilters = filterItems.filter(item => item.enabled && item.keyword && !item.exclude);
+  const activeHighlightFilters = React.useMemo(
+    () => filterItems.filter(item => item.enabled && item.keyword && !item.exclude),
+    [filterItems]
+  );
 
   const jumpToLine = useCallback((lineNum) => {
     if (logPanelRef.current) logPanelRef.current.jumpToLine(lineNum);
@@ -185,11 +188,17 @@ export default function App() {
   const [showJumpToLine, setShowJumpToLine] = useState(false);
   const [jumpLineNum, setJumpLineNum] = useState('');
 
-  // Search match count (memoized for performance)
-  const searchMatchCount = React.useMemo(() =>
-    searchTerm ? filteredLines.filter(l => l.text.toLowerCase().includes(searchTerm.toLowerCase())).length : 0,
-    [filteredLines, searchTerm]
-  );
+  // Search match count (memoized for performance, cap at 50k lines)
+  const searchMatchCount = React.useMemo(() => {
+    if (!searchTerm) return 0;
+    const term = searchTerm.toLowerCase();
+    const scanLines = filteredLines.length > 50000 ? filteredLines.slice(0, 50000) : filteredLines;
+    let count = 0;
+    for (let i = 0; i < scanLines.length; i++) {
+      if (scanLines[i].text.toLowerCase().includes(term)) count++;
+    }
+    return count;
+  }, [filteredLines, searchTerm]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -206,10 +215,25 @@ export default function App() {
       if (e.ctrlKey && e.shiftKey && e.key === 'C') { e.preventDefault(); setFilterItems([]); }
       if (e.key === 'F1') { e.preventDefault(); setShowHelp(prev => !prev); }
       if (e.ctrlKey && e.key === '/') { e.preventDefault(); setShowHelp(prev => !prev); }
+      // F3 / Shift+F3 - search navigation
+      if (e.key === 'F3' && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        if (logPanelRef.current) {
+          e.shiftKey ? logPanelRef.current.jumpToPrevSearch() : logPanelRef.current.jumpToNextSearch();
+        }
+      }
+      // Ctrl+B - toggle bookmark on current/center line
+      if (e.ctrlKey && e.key === 'b') {
+        e.preventDefault();
+        if (logPanelRef.current) {
+          const firstVisible = logPanelRef.current.getFirstVisibleLine();
+          if (firstVisible != null) toggleBookmark(firstVisible);
+        }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleOpenFile]);
+  }, [handleOpenFile, toggleBookmark]);
 
   // Load file from path (shared logic, avoids duplication)
   const loadFileFromPath = useCallback(async (fPath) => {
@@ -457,6 +481,9 @@ export default function App() {
               <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>1-4</kbd><span>切换底部标签</span></div>
               <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd><span>切换过滤/全显</span></div>
               <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd><span>清空筛选条件</span></div>
+              <div className="help-shortcut"><kbd>F3</kbd><span>跳转到下一个搜索匹配</span></div>
+              <div className="help-shortcut"><kbd>Shift</kbd>+<kbd>F3</kbd><span>跳转到上一个搜索匹配</span></div>
+              <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>B</kbd><span>切换当前行书签</span></div>
               <div className="help-shortcut"><kbd>F1</kbd><span>显示/隐藏帮助</span></div>
             </div>
           </div>

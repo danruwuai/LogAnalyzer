@@ -75,7 +75,48 @@ const LogPanel = forwardRef(function LogPanel({
         containerRef.current.scrollTop = index * LINE_HEIGHT - containerHeight / 2;
       }
     },
-  }), [lines, containerHeight]);
+    jumpToNextSearch: () => {
+      if (!searchTerm || !containerRef.current) return;
+      const term = searchTerm.toLowerCase();
+      const currentScrollLine = Math.floor(containerRef.current.scrollTop / LINE_HEIGHT);
+      for (let i = currentScrollLine + 1; i < lines.length; i++) {
+        if (lines[i].text.toLowerCase().includes(term)) {
+          containerRef.current.scrollTop = i * LINE_HEIGHT - containerHeight / 2;
+          return;
+        }
+      }
+      // Wrap around
+      for (let i = 0; i <= currentScrollLine; i++) {
+        if (lines[i].text.toLowerCase().includes(term)) {
+          containerRef.current.scrollTop = i * LINE_HEIGHT - containerHeight / 2;
+          return;
+        }
+      }
+    },
+    jumpToPrevSearch: () => {
+      if (!searchTerm || !containerRef.current) return;
+      const term = searchTerm.toLowerCase();
+      const currentScrollLine = Math.floor(containerRef.current.scrollTop / LINE_HEIGHT);
+      for (let i = currentScrollLine - 1; i >= 0; i--) {
+        if (lines[i].text.toLowerCase().includes(term)) {
+          containerRef.current.scrollTop = i * LINE_HEIGHT - containerHeight / 2;
+          return;
+        }
+      }
+      // Wrap around
+      for (let i = lines.length - 1; i >= currentScrollLine; i--) {
+        if (lines[i].text.toLowerCase().includes(term)) {
+          containerRef.current.scrollTop = i * LINE_HEIGHT - containerHeight / 2;
+          return;
+        }
+      }
+    },
+    getFirstVisibleLine: () => {
+      if (!containerRef.current) return null;
+      const idx = Math.floor(containerRef.current.scrollTop / LINE_HEIGHT);
+      return lines[idx]?.num ?? null;
+    },
+  }), [lines, containerHeight, searchTerm]);
 
   // Dynamic line number width based on total lines
   const lineNumWidth = Math.max(50, String(totalLines).length * 9 + 20);
@@ -242,7 +283,12 @@ const LogPanel = forwardRef(function LogPanel({
   // Context menu
   const handleContextMenu = (e, lineNum) => {
     e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY, lineNum });
+    // Boundary detection: ensure menu stays within viewport
+    const menuWidth = 180;
+    const menuHeight = 200;
+    const x = e.clientX + menuWidth > window.innerWidth ? window.innerWidth - menuWidth - 8 : e.clientX;
+    const y = e.clientY + menuHeight > window.innerHeight ? window.innerHeight - menuHeight - 8 : e.clientY;
+    setContextMenu({ x, y, lineNum });
   };
 
   const closeContextMenu = () => setContextMenu(null);
@@ -381,17 +427,22 @@ const LogPanel = forwardRef(function LogPanel({
             <div style={{ marginBottom: 8, color: '#a6adc8', fontSize: 13 }}>
               行 {editingAnnotation} 的注释:
             </div>
-            <input
+            <textarea
               autoFocus
+              rows={3}
               style={{
                 width: '100%', padding: '8px 10px', border: '1px solid #45475a',
                 borderRadius: 6, background: '#313244', color: '#cdd6f4',
                 fontSize: 13, outline: 'none', boxSizing: 'border-box',
+                resize: 'vertical', minHeight: 60, fontFamily: 'inherit',
               }}
               value={annotationText}
               onChange={e => setAnnotationText(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && submitAnnotation()}
-              placeholder="输入注释内容..."
+              onKeyDown={e => {
+                if (e.ctrlKey && e.key === 'Enter') { e.preventDefault(); submitAnnotation(); }
+                if (!e.ctrlKey && e.key === 'Escape') setEditingAnnotation(null);
+              }}
+              placeholder="输入注释内容... (Ctrl+Enter 保存)"
             />
             <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
               <button className="toolbar-btn" onClick={() => setEditingAnnotation(null)}>取消</button>
