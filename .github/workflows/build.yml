@@ -23,12 +23,24 @@ jobs:
       - name: Build webpack
         run: npm run build
 
-      - name: Build Electron (NSIS + Portable)
-        run: npx electron-builder --win
+      - name: Build NSIS installer
+        run: npx electron-builder --win nsis
+        env:
+          # 确保不尝试签名
+          CSC_LINK: ""
+          ELECTRON_BUILDER_SIGNING_HASH: ""
+
+      - name: Build Portable
+        run: npx electron-builder --win portable
+        env:
+          CSC_LINK: ""
+          ELECTRON_BUILDER_SIGNING_HASH: ""
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: LogAnalyzer-exe
-          path: dist/*.exe
+          path: |
+            dist/*.exe
+            !dist/*blockmap
           retention-days: 30
