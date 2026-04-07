@@ -24,7 +24,7 @@ jobs:
         run: npm run build
 
       - name: Build Electron (NSIS + Portable)
-        run: npx electron-builder --win --config.win.target=nsis,portable --win.sign=false
+        run: npx electron-builder --win
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
