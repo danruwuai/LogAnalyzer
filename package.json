@@ -6,7 +6,18 @@
   "scripts": {
     "start": "electron .",
     "build": "webpack --mode production",
-    "dev": "webpack --mode development --watch"
+    "dev": "webpack --mode development --watch",
+    "pack": "npx electron-builder --win"
+  },
+  "build": {
+    "appId": "com.danruwuai.loganalyzer",
+    "productName": "LogAnalyzer",
+    "directories": { "output": "dist" },
+    "files": ["**/*", "!node_modules/.cache"],
+    "win": {
+      "target": ["nsis"],
+      "signAndEditExecutable": false
+    }
   },
   "dependencies": {
     "echarts": "^6.0.0",
@@ -20,6 +31,7 @@
     "babel-loader": "^10.1.1",
     "css-loader": "^7.1.0",
     "electron": "^33.0.0",
+    "electron-builder": "^26.8.1",
     "html-webpack-plugin": "^5.6.0",
     "style-loader": "^4.0.0",
     "webpack": "^5.97.0",
