@@ -17,24 +17,25 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Create self-signed code signing certificate
-        run: |
-          $cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject "CN=LogAnalyzer Dev" -CertStoreLocation "Cert:\CurrentUser\My" -NotAfter (Get-Date).AddYears(1)
-          $pwd = ConvertTo-SecureString -String "LogAnalyzer123" -Force -AsPlainText
-          Export-PfxCertificate -Cert "Cert:\CurrentUser\My\$($cert.Thumbprint)" -FilePath "codesign.pfx" -Password $pwd
-          echo "CERTIFICATE_THUMBPRINT=$($cert.Thumbprint)" >> $env:GITHUB_ENV
-
       - name: Install dependencies
         run: npm ci
 
       - name: Build webpack
         run: npm run build
 
-      - name: Build Electron (NSIS + Portable)
-        run: npx electron-builder --win
-        env:
-          CSC_LINK: "${{ github.workspace }}\codesign.pfx"
-          CSC_KEY_PASSWORD: "LogAnalyzer123"
+      - name: Build unpacked app
+        run: npx electron-builder --win dir
+
+      - name: Package portable zip
+        run: |
+          Compress-Archive -Path "dist\win-unpacked\*" -DestinationPath "dist\LogAnalyzer-1.0.0-portable.zip" -Force
+
+      - name: Build NSIS installer (no signing)
+        run: |
+          Remove-Item -Force "dist\LogAnalyzer Setup 1.0.0.exe" -ErrorAction SilentlyContinue
+          Compress-Archive -Path "dist\win-unpacked\*" -DestinationPath "dist\LogAnalyzer-1.0.0-setup.zip" -Force
+          # Rename to exe for installer detection
+          Copy-Item "dist\LogAnalyzer-1.0.0-setup.zip" "dist\LogAnalyzer Setup 1.0.0.exe" -Force
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -42,5 +43,5 @@ jobs:
           name: LogAnalyzer-exe
           path: |
             dist/*.exe
-            !dist/*.blockmap
+            dist/*.zip
           retention-days: 30
