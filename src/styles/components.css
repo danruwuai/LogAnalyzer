@@ -1,0 +1,251 @@
+/**
+ * LogAnalyzer Component Styles
+ * Based on DESIGN.md Section 4
+ * Ref: variables.css for design tokens
+ */
+
+/* ============================================
+   4.1 按钮系统 (Button System)
+   ============================================ */
+
+/* Ghost Button — 默认/次要操作 */
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  font-size: var(--text-sm);
+  font-weight: 510;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.btn-ghost:active {
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(1px);
+}
+
+/* Primary Button — 主要操作 */
+.btn-primary {
+  background: var(--brand-primary);
+  border: none;
+  color: #ffffff;
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  font-size: var(--text-sm);
+  font-weight: 590;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.btn-primary:hover {
+  background: var(--brand-hover);
+}
+.btn-primary:active {
+  background: var(--brand-primary);
+}
+
+/* Icon Button — 图标按钮 (固定尺寸) */
+.btn-icon {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  color: var(--text-tertiary);
+  border-radius: var(--radius-md);
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+.btn-icon:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+}
+.btn-icon:active {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Toolbar Button — 小工具栏按钮 (紧凑) */
+.btn-toolbar {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  font-size: var(--text-xs);
+  font-weight: 510;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  box-shadow: rgba(0, 0, 0, 0.03) 0px 1px 0px 0px;
+}
+.btn-toolbar:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-tertiary);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.btn-toolbar:active {
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: var(--shadow-inset);
+}
+
+/* ============================================
+   4.2 输入框 (Input)
+   ============================================ */
+
+.input {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-family: var(--font-sans);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+.input::placeholder {
+  color: var(--text-muted);
+}
+.input:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+/* 聚焦样式：brand-accent 边框 + glow */
+.input:focus {
+  border-color: rgba(113, 112, 255, 0.5);
+  box-shadow: 0 0 0 3px rgba(113, 112, 255, 0.15);
+}
+.input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ============================================
+   4.3 卡片/面板 (Card / Panel)
+   ============================================ */
+
+.card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.card:hover {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* 筛选面板项目 */
+.filter-item {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  transition: all 0.15s;
+  cursor: pointer;
+}
+.filter-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+.filter-item.active {
+  background: rgba(113, 112, 255, 0.1);
+  border-color: rgba(113, 112, 255, 0.3);
+}
+
+/* ============================================
+   4.4 标签/徽章 (Badge)
+   ============================================ */
+
+.badge {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  font-size: var(--text-xs);
+  font-weight: 510;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.badge-success {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: var(--status-success);
+}
+
+.badge-warning {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--status-warning);
+}
+
+.badge-error {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--status-error);
+}
+
+.badge-info {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: var(--status-info);
+}
+
+/* ============================================
+   7.1 日志行高亮样式 (Log Row Highlight)
+   ============================================ */
+
+/* 包含关键字的行 (一般高亮) */
+.log-row-highlighted {
+  background: rgba(203, 166, 247, 0.08);
+  border-left: 2px solid var(--highlight-1);
+}
+
+/* ERROR 行 */
+.log-row.level-error {
+  background: rgba(239, 68, 68, 0.08);
+  border-left: 2px solid var(--status-error);
+}
+
+/* WARN 行 */
+.log-row.level-warn {
+  background: rgba(245, 158, 11, 0.06);
+  border-left: 2px solid var(--status-warning);
+}
+
+/* 书签行 */
+.log-row.bookmarked {
+  background: rgba(113, 112, 255, 0.06);
+  border-left: 2px solid var(--brand-accent);
+}
+
+/* 收敛状态 (isConverge=1) */
+.log-row.converged {
+  border-left: 2px solid var(--status-success);
+}
+
+/* 发散状态 (isConverge=0) */
+.log-row.diverged {
+  border-left: 2px solid var(--status-error);
+}

@@ -168,27 +168,68 @@ body {
   position: relative;
 }
 
+/* ============================================
+   日志行 — 优化版 (DESIGN.md Section 5.3)
+   - 行高从 1.4 → 1.6
+   - padding 增加
+   - 极微妙交替行背景
+   ============================================ */
 .log-line {
   display: flex;
-  padding: 0 8px;
+  padding: 0 12px;         /* 水平 padding 增加: 8px → 12px */
   cursor: default;
   white-space: nowrap;
   align-items: center;
-  font-size: 12px;
-  line-height: 18px;
+  font-size: 13px;          /* 从 12px 微调至 13px */
+  line-height: 20.8px;      /* line-height: 1.6 × 13px = 20.8px (DESIGN.md) */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.02);  /* 细微分隔线 */
+}
+
+/* 极微妙交替行背景 */
+.log-line:nth-child(even) {
+  background: rgba(255, 255, 255, 0.01);
 }
 
 .log-line:hover {
-  background: var(--bg-secondary) !important;
+  background: rgba(255, 255, 255, 0.04) !important;
 }
 
+/* 书签行 — 品牌紫语义色 (DESIGN.md Section 7.1) */
 .log-line.bookmarked {
-  background: rgba(249, 226, 175, 0.06);
+  background: rgba(113, 112, 255, 0.06);
+  border-left: 2px solid #7170ff;  /* --brand-accent */
 }
 
+/* 图表关联行 */
 .log-line.chart-linked {
   outline: 1px solid var(--accent);
   outline-offset: -1px;
+}
+
+/* ============================================
+   语义化行高亮 (DESIGN.md Section 7.1)
+   ============================================ */
+
+/* ERROR 行 — 状态色语义 */
+.log-line.level-error {
+  background: rgba(239, 68, 68, 0.08);
+  border-left: 2px solid #ef4444;  /* --status-error */
+}
+
+/* WARN 行 — 状态色语义 */
+.log-line.level-warn {
+  background: rgba(245, 158, 11, 0.06);
+  border-left: 2px solid #f59e0b;  /* --status-warning */
+}
+
+/* 收敛行 — isConverge=1 */
+.log-line.converged {
+  border-left: 2px solid #10b981;  /* --status-success */
+}
+
+/* 发散行 — isConverge=0 */
+.log-line.diverged {
+  border-left: 2px solid #ef4444;  /* --status-error */
 }
 
 .log-line-number {
@@ -414,6 +455,74 @@ body {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
+}
+
+/* Panel fullscreen mode */
+.panel-fullscreen {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+}
+
+/* Chart fullscreen: chart fills main content area */
+.chart-fullscreen-container {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Annotations fullscreen */
+.annotations-fullscreen-container {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Toolbar inside fullscreen panels */
+.chart-fullscreen-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* Tab bar in fullscreen mode (mini, at bottom) */
+.chart-fullscreen-tabs {
+  flex-shrink: 0;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border);
+  padding: 0 4px;
+}
+
+/* Fullscreen toggle button */
+.panel-fullscreen-btn:hover {
+  background: var(--bg-tertiary) !important;
+  color: var(--accent) !important;
+}
+
+/* Exit fullscreen button */
+.exit-fullscreen {
+  background: var(--bg-tertiary) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 4px !important;
+  padding: 2px 10px !important;
+  font-size: 12px !important;
+  color: var(--text-secondary) !important;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.exit-fullscreen:hover {
+  background: var(--border) !important;
+  color: var(--text-primary) !important;
+}
+
+/* Panel hidden (completely removed from layout) */
+.panel-hidden {
+  display: none !important;
 }
 
 /* Draggable Panel */

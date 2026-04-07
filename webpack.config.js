@@ -5,8 +5,38 @@ module.exports = {
   entry: './src/index.js',
   output: {
     path: path.resolve(__dirname, 'dist'),
-    filename: 'bundle.[contenthash].js',
+    filename: '[name].[contenthash].js',
+    chunkFilename: '[name].[contenthash].js',
     clean: true,
+  },
+  optimization: {
+    splitChunks: {
+      chunks: 'all',
+      cacheGroups: {
+        // ECharts 单独一个 chunk（最大）
+        echarts: {
+          test: /[\\/]node_modules[\\/]echarts[\\/]/,
+          name: 'echarts',
+          priority: 30,
+          reuseExistingChunk: true,
+        },
+        // React 生态单独一个 chunk
+        react: {
+          test: /[\\/]node_modules[\\/](react|react-dom)[\\/]/,
+          name: 'react-vendor',
+          priority: 20,
+          reuseExistingChunk: true,
+        },
+        // 其他 vendor 模块
+        vendors: {
+          test: /[\\/]node_modules[\\/]/,
+          name: 'vendors',
+          priority: 10,
+          reuseExistingChunk: true,
+        },
+      },
+    },
+    runtimeChunk: 'single',
   },
   module: {
     rules: [
@@ -37,4 +67,6 @@ module.exports = {
     }),
   ],
   devtool: 'source-map',
+  // Electron 桌面应用不走网络，关闭 bundle size 警告
+  performance: false,
 };

@@ -1,7 +1,8 @@
 import React, { useRef, useState, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { Icons } from './Icons';
 
-const LINE_HEIGHT = 18;
+/* DESIGN.md: log 行高从 1.4 → 1.6, line-height: 20.8px (约 21px) */
+const LINE_HEIGHT = 21;
 const BUFFER_LINES = 20;
 
 // Pre-compiled regex cache to avoid recompilation on every line render
@@ -340,10 +341,26 @@ const LogPanel = forwardRef(function LogPanel({
             const hasAnnotation = annotations.hasOwnProperty(line.num);
             const isChartLinked = chartLinkedLine === line.num;
 
+            // 语义化行类型检测 (DESIGN.md Section 7.1)
+            const textLower = line.text.toLowerCase();
+            const isError = textLower.includes('error') || textLower.includes('exception') || textLower.includes('fatal');
+            const isWarn  = !isError && (textLower.includes('warn') || textLower.includes('warning'));
+            const isConverged = textLower.includes('isconverge=1');
+            const isDiverged  = textLower.includes('isconverge=0');
+
+            const semanticClasses = [
+              isBookmarked ? 'bookmarked' : '',
+              isChartLinked ? 'chart-linked' : '',
+              isError ? 'level-error' : '',
+              isWarn  ? 'level-warn'  : '',
+              isConverged ? 'converged' : '',
+              isDiverged  ? 'diverged'  : '',
+            ].filter(Boolean).join(' ');
+
             return (
               <div
                 key={line.num}
-                className={`log-line ${isBookmarked ? 'bookmarked' : ''} ${isChartLinked ? 'chart-linked' : ''}`}
+                className={`log-line ${semanticClasses}`}
                 style={{
                   position: 'absolute',
                   top: actualIdx * LINE_HEIGHT,

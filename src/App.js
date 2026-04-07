@@ -5,6 +5,7 @@ import LogPanel from './components/LogPanel';
 import StatusBar from './components/StatusBar';
 import DraggablePanel from './components/DraggablePanel';
 import { Icons } from './components/Icons';
+import { logAnalyzerTheme } from './components/echarts-theme'; /* DESIGN.md ECharts 暗色主题 (P1) */
 
 const COLORS = ['#89b4fa', '#a6e3a1', '#f9e2af', '#f38ba8', '#fab387', '#cba6f7', '#94e2d5'];
 
@@ -56,21 +57,65 @@ export default function App() {
   const [showBottomPanel, setShowBottomPanel] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
 
-  // Panel maximize & z-index state
-  const [maximizedPanel, setMaximizedPanel] = useState(null); // null | 'log' | 'bottom'
+  // Panel mode (replaces maximizedPanel)
+  // 'split' | 'log-full' | 'chart-full' | 'annotations-full'
+  const [panelMode, setPanelMode] = useState('split');
   const [panelZIndex, setPanelZIndex] = useState({ log: 10, bottom: 10 });
   const topZRef = useRef(10);
 
+  // Handle fullscreen for any panel type
+  const handlePanelFullscreen = useCallback((panelType) => {
+    if (panelType === panelMode) {
+      setPanelMode('split');
+    } else {
+      setPanelMode(panelType);
+    }
+  }, [panelMode]);
+
+  // Backward compat: handleMaximize/handleRestore still used by DraggablePanel
   const handleMaximize = useCallback((panelId) => {
-    setMaximizedPanel(panelId);
+    // Map old maximizedPanel to new panelMode
+    if (panelId === 'log') setPanelMode('log-full');
+    else if (panelId === 'bottom') setPanelMode('chart-full'); // default to chart
   }, []);
   const handleRestore = useCallback(() => {
-    setMaximizedPanel(null);
+    setPanelMode('split');
   }, []);
   const handleBringToFront = useCallback((panelId) => {
     topZRef.current += 1;
     setPanelZIndex(prev => ({ ...prev, [panelId]: topZRef.current }));
   }, []);
+
+  // Chart data - computed once at App level for reuse in fullscreen stats
+  const chartData = React.useMemo(() => {
+    if (extractors.length === 0 || lines.length === 0) return null;
+    const regexes = extractors.map(e => {
+      try { return { name: e.name, regex: new RegExp(e.regex), color: e.color }; }
+      catch { return null; }
+    }).filter(Boolean);
+    if (regexes.length === 0) return null;
+    const linesToProcess = lines.length > 20000 ? lines.slice(0, 20000) : lines;
+    const results = [];
+    for (const line of linesToProcess) {
+      const point = { lineNum: line.num, text: line.text };
+      let hasData = false;
+      for (const r of regexes) {
+        const match = line.text.match(r.regex);
+        if (match) {
+          for (let g = 1; g < match.length; g++) {
+            const val = parseFloat(match[g]);
+            if (!isNaN(val)) {
+              const key = match.length > 2 ? `${r.name}_g${g}` : r.name;
+              point[key] = val;
+              hasData = true;
+            }
+          }
+        }
+      }
+      if (hasData) results.push(point);
+    }
+    return results;
+  }, [lines, extractors]);
 
   // Saved profiles (unified: filters + extractors + thresholds)
   const [profiles, setProfiles] = useState(() => {
@@ -247,10 +292,19 @@ export default function App() {
           if (firstVisible != null) toggleBookmark(firstVisible);
         }
       }
+      // Ctrl+Shift+L - log fullscreen toggle
+      if (e.ctrlKey && e.shiftKey && e.key === 'L') {
+        e.preventDefault();
+        setPanelMode(prev => prev === 'log-full' ? 'split' : 'log-full');
+      }
+      // Escape - exit any fullscreen mode
+      if (e.key === 'Escape' && panelMode !== 'split') {
+        setPanelMode('split');
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleOpenFile, toggleBookmark]);
+  }, [handleOpenFile, toggleBookmark, panelMode]);
 
   // Load file from path (shared logic, avoids duplication)
   const loadFileFromPath = useCallback(async (fPath) => {
@@ -409,18 +463,28 @@ export default function App() {
       ) : (
         <ErrorBoundary>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {/* Log panel - takes most space */}
-          {maximizedPanel !== 'bottom' && (
+          {/* Log panel - always rendered except in log-full mode (rendered by DraggablePanel in fullscreen) */}
+          {panelMode !== 'log-full' && (
             <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
               <DraggablePanel
                 title={`日志 ${filteredLines.length > 0 ? `(${filteredLines.length}行)` : ''}`}
                 icon={<Icons.File />}
                 panelId="log"
-                isMaximized={maximizedPanel === 'log'}
+                isMaximized={panelMode === 'log-full'}
                 onMaximize={handleMaximize}
                 onRestore={handleRestore}
                 zIndex={panelZIndex.log}
                 onZIndexRequest={() => handleBringToFront('log')}
+                actions={
+                  <button
+                    className="panel-title-btn panel-fullscreen-btn"
+                    onClick={() => handlePanelFullscreen('log-full')}
+                    title="全屏 (Ctrl+Shift+L)"
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted, #6c7086)', cursor: 'pointer', fontSize: 14, padding: '2px 6px', borderRadius: 3, display: 'flex', alignItems: 'center' }}
+                  >
+                    ⛶
+                  </button>
+                }
               >
                 <LogPanel
                   ref={logPanelRef}
@@ -440,30 +504,50 @@ export default function App() {
             </div>
           )}
 
-          {/* Bottom panel (tabs + content wrapped together) */}
-          {maximizedPanel !== 'log' && (
+          {/* Bottom panel - always rendered in split mode; hidden in log-full */}
+          {panelMode === 'split' && (
             <div style={{ flexShrink: 0 }}>
+              {/* Bottom tab bar - always visible in split mode */}
+              <div className="bottom-panel-tabs">
+                {['filter', 'chart', 'annotations', 'config'].map(tab => (
+                  <button key={tab}
+                    className={`bottom-panel-tab ${bottomPanel === tab ? 'active' : ''}`}
+                    onClick={() => { setBottomPanel(tab); setShowBottomPanel(true); }}
+                  >
+                    {tab === 'filter' && <><Icons.Filter /> 筛选 ({filterItems.length})</>}
+                    {tab === 'chart' && <><Icons.Chart /> 图表 ({extractors.length})</>}
+                    {tab === 'annotations' && <><Icons.NoteList /> 注释 ({Object.keys(annotations).length})</>}
+                    {tab === 'config' && <><Icons.Gear /> 配置</>}
+                  </button>
+                ))}
+                {/* Separator */}
+                <span style={{ flex: 1 }} />
+                {/* Fullscreen buttons per tab */}
+                {bottomPanel === 'chart' && (
+                  <button className="bottom-panel-tab panel-fullscreen-btn"
+                    onClick={() => handlePanelFullscreen('chart-full')}
+                    title="图表全屏" style={{ fontSize: 14 }}>
+                    ⛶
+                  </button>
+                )}
+                {bottomPanel === 'annotations' && (
+                  <button className="bottom-panel-tab panel-fullscreen-btn"
+                    onClick={() => handlePanelFullscreen('annotations-full')}
+                    title="注释全屏" style={{ fontSize: 14 }}>
+                    ⛶
+                  </button>
+                )}
+                {/* Toggle collapse */}
+                <button className="bottom-panel-tab" onClick={() => setShowBottomPanel(p => !p)} style={{ padding: '2px 8px' }}>
+                  {showBottomPanel ? '▼' : '▲'}
+                </button>
+              </div>
+
+              {/* Bottom panel content (DraggablePanel as content container) */}
               <DraggablePanel
-                title={
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    {['filter', 'chart', 'annotations', 'config'].map(tab => (
-                      <button key={tab}
-                        className={`bottom-panel-tab ${bottomPanel === tab ? 'active' : ''}`}
-                        onClick={() => { setBottomPanel(tab); setShowBottomPanel(true); }}
-                        style={{ padding: '2px 10px' }}>
-                        {tab === 'filter' && <><Icons.Filter /> 筛选 ({filterItems.length})</>}
-                        {tab === 'chart' && <><Icons.Chart /> 图表 ({extractors.length})</>}
-                        {tab === 'annotations' && <><Icons.NoteList /> 注释 ({Object.keys(annotations).length})</>}
-                        {tab === 'config' && <><Icons.Gear /> 配置</>}
-                      </button>
-                    ))}
-                    <button className="bottom-panel-tab" onClick={() => setShowBottomPanel(p => !p)} style={{ padding: '2px 8px' }}>
-                      {showBottomPanel ? '▼' : '▲'}
-                    </button>
-                  </span>
-                }
+                title={null}
                 panelId="bottom"
-                isMaximized={maximizedPanel === 'bottom'}
+                isMaximized={false}
                 onMaximize={handleMaximize}
                 onRestore={handleRestore}
                 zIndex={panelZIndex.bottom}
@@ -477,7 +561,7 @@ export default function App() {
                       filterMode={filterMode} onFilterModeChange={setFilterMode}
                     />}
                     {bottomPanel === 'chart' && <ChartPanelInline
-                      lines={lines} extractors={extractors}
+                      lines={lines} extractors={extractors} chartData={chartData}
                       onAddExtractor={addExtractor} onUpdateExtractor={updateExtractor} onRemoveExtractor={removeExtractor}
                       xAxisMode={xAxisMode} onXAxisModeChange={setXAxisMode}
                       xAxisField={xAxisField} onXAxisFieldChange={setXAxisField}
@@ -494,6 +578,89 @@ export default function App() {
                   </ErrorBoundary>
                 )}
               </DraggablePanel>
+            </div>
+          )}
+
+          {/* Chart fullscreen - chart takes entire main area */}
+          {panelMode === 'chart-full' && (
+            <div className="panel-fullscreen chart-fullscreen-container">
+              <div className="chart-fullscreen-toolbar">
+                <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                  <Icons.Chart /> 图表全屏
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+                  {extractors.length} 指标 | {chartData?.length || 0} 数据点
+                </span>
+                <button className="panel-title-btn panel-fullscreen-btn exit-fullscreen"
+                  onClick={() => setPanelMode('split')}
+                  title="退出全屏 (Esc)"
+                >
+                  ⊡ 退出全屏
+                </button>
+              </div>
+              <div style={{ flex: 1, padding: '0 12px 12px' }}>
+                <ChartPanelInline
+                  lines={lines} extractors={extractors} chartData={chartData}
+                  onAddExtractor={addExtractor} onUpdateExtractor={updateExtractor} onRemoveExtractor={removeExtractor}
+                  xAxisMode={xAxisMode} onXAxisModeChange={setXAxisMode}
+                  xAxisField={xAxisField} onXAxisFieldChange={setXAxisField}
+                  thresholds={thresholds} onAddThreshold={addThreshold} onUpdateThreshold={updateThreshold} onRemoveThreshold={removeThreshold}
+                  annotations={annotations} onJumpToLine={jumpToLine} chartLinkedLine={chartLinkedLine}
+                />
+              </div>
+              {/* Mini tab bar for switching tabs */}
+              <div className="bottom-panel-tabs chart-fullscreen-tabs">
+                {['filter', 'chart', 'annotations', 'config'].map(tab => (
+                  <button key={tab}
+                    className={`bottom-panel-tab ${bottomPanel === tab ? 'active' : ''}`}
+                    onClick={() => { setBottomPanel(tab); setPanelMode(tab === 'chart' ? 'chart-full' : tab === 'annotations' ? 'annotations-full' : 'split'); }}
+                  >
+                    {tab === 'filter' && <><Icons.Filter /> 筛选</>}
+                    {tab === 'chart' && <><Icons.Chart /> 图表</>}
+                    {tab === 'annotations' && <><Icons.NoteList /> 注释</>}
+                    {tab === 'config' && <><Icons.Gear /> 配置</>}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Annotations fullscreen */}
+          {panelMode === 'annotations-full' && (
+            <div className="panel-fullscreen annotations-fullscreen-container">
+              <div className="chart-fullscreen-toolbar">
+                <span style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                  <Icons.NoteList /> 注释全屏
+                </span>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+                  {Object.keys(annotations).length} 条注释
+                </span>
+                <button className="panel-title-btn panel-fullscreen-btn exit-fullscreen"
+                  onClick={() => setPanelMode('split')}
+                  title="退出全屏 (Esc)"
+                >
+                  ⊡ 退出全屏
+                </button>
+              </div>
+              <div style={{ flex: 1, padding: '0 12px 12px' }}>
+                <AnnotationsPanelInline
+                  annotations={annotations} onRemoveAnnotation={removeAnnotation} onJumpToLine={jumpToLine}
+                />
+              </div>
+              {/* Mini tab bar */}
+              <div className="bottom-panel-tabs chart-fullscreen-tabs">
+                {['filter', 'chart', 'annotations', 'config'].map(tab => (
+                  <button key={tab}
+                    className={`bottom-panel-tab ${bottomPanel === tab ? 'active' : ''}`}
+                    onClick={() => { setBottomPanel(tab); setPanelMode(tab === 'chart' ? 'chart-full' : tab === 'annotations' ? 'annotations-full' : 'split'); }}
+                  >
+                    {tab === 'filter' && <><Icons.Filter /> 筛选</>}
+                    {tab === 'chart' && <><Icons.Chart /> 图表</>}
+                    {tab === 'annotations' && <><Icons.NoteList /> 注释</>}
+                    {tab === 'config' && <><Icons.Gear /> 配置</>}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -518,13 +685,15 @@ export default function App() {
               <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>O</kbd><span>打开文件</span></div>
               <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>F</kbd><span>聚焦搜索框</span></div>
               <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>G</kbd><span>跳转到行号</span></div>
-              <div className="help-shortcut"><kbd>Esc</kbd><span>清除搜索/关闭对话框</span></div>
+              <div className="help-shortcut"><kbd>Esc</kbd><span>清除搜索/关闭对话框/退出全屏</span></div>
               <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>1-4</kbd><span>切换底部标签</span></div>
               <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>F</kbd><span>切换过滤/全显</span></div>
               <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd><span>清空筛选条件</span></div>
               <div className="help-shortcut"><kbd>F3</kbd><span>跳转到下一个搜索匹配</span></div>
               <div className="help-shortcut"><kbd>Shift</kbd>+<kbd>F3</kbd><span>跳转到上一个搜索匹配</span></div>
               <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>B</kbd><span>切换当前行书签</span></div>
+              <div className="help-shortcut"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>L</kbd><span>日志全屏切换</span></div>
+              <div className="help-shortcut"><kbd>双击标题栏</kbd><span>日志/面板全屏还原</span></div>
               <div className="help-shortcut"><kbd>F1</kbd><span>显示/隐藏帮助</span></div>
             </div>
           </div>
@@ -578,15 +747,15 @@ function FilterPanelInline({ filterItems, onFilterItemsChange, filterMode, onFil
   );
 }
 
-function ChartPanelInline({ lines, extractors, onAddExtractor, onUpdateExtractor, onRemoveExtractor,
+function ChartPanelInline({ lines, extractors, chartData: chartDataProp, onAddExtractor, onUpdateExtractor, onRemoveExtractor,
   xAxisMode, onXAxisModeChange, xAxisField, onXAxisFieldChange,
   thresholds, onAddThreshold, onUpdateThreshold, onRemoveThreshold,
   annotations, onJumpToLine, chartLinkedLine }) {
 
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
-
-  const chartData = React.useMemo(() => {
+  // Use prop chartData if provided (computed at App level), otherwise fall back to inline computation
+  const chartData = chartDataProp !== undefined ? chartDataProp : React.useMemo(() => {
     if (extractors.length === 0 || lines.length === 0) return null;
     const regexes = extractors.map(e => {
       try { return { name: e.name, regex: new RegExp(e.regex), color: e.color }; }
@@ -601,7 +770,6 @@ function ChartPanelInline({ lines, extractors, onAddExtractor, onUpdateExtractor
       for (const r of regexes) {
         const match = line.text.match(r.regex);
         if (match) {
-          // Support multiple capture groups
           for (let g = 1; g < match.length; g++) {
             const val = parseFloat(match[g]);
             if (!isNaN(val)) {
@@ -620,7 +788,7 @@ function ChartPanelInline({ lines, extractors, onAddExtractor, onUpdateExtractor
   useEffect(() => {
     if (!chartRef.current) return;
     if (!chartInstance.current) {
-      chartInstance.current = echarts.init(chartRef.current, null, { renderer: 'canvas' });
+      chartInstance.current = echarts.init(chartRef.current, logAnalyzerTheme, { renderer: 'canvas' });
     }
     if (!chartData || chartData.length === 0) { chartInstance.current.clear(); return; }
 
@@ -648,14 +816,19 @@ function ChartPanelInline({ lines, extractors, onAddExtractor, onUpdateExtractor
     });
 
     chartInstance.current.setOption({
+      /* 背景透明，使用 CSS 背景穿透 */
       backgroundColor: 'transparent',
-      tooltip: { trigger: 'axis', backgroundColor: '#1e1e2e', borderColor: '#45475a', textStyle: { color: '#cdd6f4' } },
-      legend: { data: metricNames, top: 0, textStyle: { color: '#a6adc8', fontSize: 11 } },
+      /* 图例 */
+      legend: { data: metricNames, top: 0, textStyle: { color: '#8a8f98', fontSize: 11 } },
+      /* 网格 */
       grid: { left: 50, right: 20, top: 30, bottom: 25 },
-      xAxis: { type: 'category', data: xData, axisLabel: { color: '#6c7086', fontSize: 10 } },
-      yAxis: { type: 'value', axisLabel: { color: '#6c7086', fontSize: 10 }, splitLine: { lineStyle: { color: '#313244' } } },
-      series,
+      /* X轴 */
+      xAxis: { type: 'category', data: xData, axisLabel: { color: '#8a8f98', fontSize: 10 } },
+      /* Y轴 */
+      yAxis: { type: 'value', axisLabel: { color: '#8a8f98', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } } },
+      /* 缩放 */
       dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 0, height: 16 }],
+      series,
     }, true);
 
     const handleResize = () => chartInstance.current?.resize();
