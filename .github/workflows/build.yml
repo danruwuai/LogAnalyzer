@@ -1,10 +1,8 @@
-name: Build & Release
+name: Build
 
 on:
   push:
     branches: [master]
-  release:
-    types: [published]
 
 jobs:
   build:
@@ -27,33 +25,10 @@ jobs:
 
       - name: Build Electron (NSIS + Portable)
         run: npx electron-builder --win --config.win.target=nsis,portable
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: LogAnalyzer-exe
-          path: |
-            dist/*.exe
-            dist/*.blockmap
+          path: dist/*.exe
           retention-days: 30
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'release'
-
-    steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: LogAnalyzer-exe
-          path: artifacts
-
-      - name: Attach to release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: artifacts/*.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
