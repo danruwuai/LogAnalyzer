@@ -262,6 +262,21 @@ export default function App() {
     return count;
   }, [filteredLines, searchTerm]);
 
+  // Convergence statistics (computed from all lines, not filtered)
+  const convergenceStats = React.useMemo(() => {
+    if (lines.length === 0) return { converged: 0, diverged: 0, trend: 'stable' };
+    let converged = 0;
+    let diverged = 0;
+    for (const line of lines) {
+      const textLower = line.text.toLowerCase();
+      if (textLower.includes('isconverge=1')) converged++;
+      if (textLower.includes('isconverge=0')) diverged++;
+    }
+    // Simple trend: if converged > diverged, converging
+    const trend = converged > diverged ? 'converging' : converged < diverged ? 'diverging' : 'stable';
+    return { converged, diverged, trend };
+  }, [lines]);
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -672,6 +687,9 @@ export default function App() {
         filePath={filePath} bookmarkCount={bookmarks.size}
         annotationCount={Object.keys(annotations).length}
         onExportFiltered={handleExportFiltered} filterMode={filterMode}
+        convergedCount={convergenceStats.converged}
+        divergedCount={convergenceStats.diverged}
+        convergenceTrend={convergenceStats.trend}
       />
 
       {showHelp && (
