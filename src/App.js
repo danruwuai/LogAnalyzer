@@ -4,6 +4,7 @@ import Toolbar from './components/Toolbar';
 import LogPanel from './components/LogPanel';
 import StatusBar from './components/StatusBar';
 import DraggablePanel from './components/DraggablePanel';
+import TimelineOverview from './components/TimelineOverview';
 import { Icons } from './components/Icons';
 import { logAnalyzerTheme } from './components/echarts-theme'; /* DESIGN.md ECharts 暗色主题 (P1) */
 
@@ -517,6 +518,18 @@ export default function App() {
                 />
               </DraggablePanel>
             </div>
+          )}
+
+          {/* Timeline Overview - 日志密度缩略图 */}
+          {panelMode !== 'log-full' && lines.length > 0 && (
+            <TimelineOverview
+              lines={lines}
+              totalLines={totalLines}
+              visibleStart={0}
+              visibleEnd={Math.min(lines.length, 1000)}
+              onViewportChange={(start, end) => console.log('viewport change', start, end)}
+              onJumpToLine={jumpToLine}
+            />
           )}
 
           {/* Bottom panel - always rendered in split mode; hidden in log-full */}

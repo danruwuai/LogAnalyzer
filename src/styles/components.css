@@ -249,3 +249,81 @@
 .log-row.diverged {
   border-left: 2px solid var(--status-error);
 }
+
+/* ============================================
+   Sprint 2 - 时间轴缩略图 (Timeline Overview)
+   ============================================ */
+
+.timeline-container {
+  height: 40px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.timeline-density-bar {
+  flex: 1;
+  height: 24px;
+  display: flex;
+  align-items: flex-end;
+  gap: 1px;
+  cursor: pointer;
+  position: relative;
+}
+
+.timeline-density-bar .bar-segment {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 1px 1px 0 0;
+  transition: background 0.1s;
+  min-width: 2px;
+  max-width: 8px;
+}
+.timeline-density-bar .bar-segment:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.timeline-density-bar .bar-segment.has-error {
+  background: rgba(239, 68, 68, 0.4);
+}
+.timeline-density-bar .bar-segment.has-warn {
+  background: rgba(245, 158, 11, 0.35);
+}
+.timeline-density-bar .bar-segment.has-info {
+  background: rgba(59, 130, 246, 0.25);
+}
+.timeline-density-bar .bar-segment.blank {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.timeline-viewport {
+  position: absolute;
+  height: 100%;
+  background: rgba(113, 112, 255, 0.15);
+  border: 1px solid var(--brand-accent);
+  border-radius: 4px;
+  cursor: grab;
+  transition: border-color 0.15s;
+}
+.timeline-viewport:hover {
+  background: rgba(113, 112, 255, 0.25);
+  border-color: var(--brand-hover);
+}
+.timeline-viewport.dragging {
+  cursor: grabbing;
+  background: rgba(113, 112, 255, 0.3);
+}
+
+.timeline-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  user-select: none;
+}
+.timeline-label.start { text-align: left; }
+.timeline-label.end { text-align: right; }
