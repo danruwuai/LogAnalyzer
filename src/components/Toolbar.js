@@ -29,7 +29,7 @@ export default function Toolbar({
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={handleSearchKey} />
         {searchTerm && searchMatchCount > 0 && (
-          <span style={{ fontSize: 11, color: '#a6e3a1', whiteSpace: 'nowrap', padding: '0 6px' }}>
+          <span style={{ fontSize: 11, color: 'var(--highlight-3)', whiteSpace: 'nowrap', padding: '0 6px' }}>
             {searchMatchCount} 匹配
           </span>
         )}

@@ -125,7 +125,7 @@ export default function DraggablePanel({
           zIndex: 9999,
           display: 'flex',
           flexDirection: 'column',
-          background: 'var(--bg-primary, #1e1e2e)',
+          background: 'var(--bg-canvas)',
           ...style,
         }}
       >
@@ -137,14 +137,14 @@ export default function DraggablePanel({
             alignItems: 'center',
             gap: 8,
             padding: '6px 12px',
-            background: 'var(--bg-secondary, #181825)',
-            borderBottom: '1px solid var(--border, #45475a)',
+            background: 'var(--bg-panel)',
+            borderBottom: '1px solid var(--border-default)',
             cursor: 'default',
             userSelect: 'none',
             flexShrink: 0,
           }}
         >
-          <span style={{ fontSize: 12, color: 'var(--text-secondary, #a6adc8)', display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
             {icon}
             {title}
           </span>
@@ -156,7 +156,7 @@ export default function DraggablePanel({
             style={{
               background: 'none',
               border: 'none',
-              color: 'var(--text-muted, #6c7086)',
+              color: 'var(--text-muted)',
               cursor: 'pointer',
               fontSize: 14,
               padding: '2px 6px',
@@ -188,10 +188,10 @@ export default function DraggablePanel({
           zIndex: zIndex,
           display: 'flex',
           flexDirection: 'column',
-          background: 'var(--bg-primary, #1e1e2e)',
-          border: '1px solid var(--border, #45475a)',
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border-default)',
           borderRadius: 6,
-          boxShadow: isDragging ? '0 8px 24px rgba(0,0,0,0.4)' : '0 4px 12px rgba(0,0,0,0.3)',
+          boxShadow: isDragging ? '0 8px 24px rgba(0,0,0,0.5)' : '0 4px 12px rgba(0,0,0,0.4)',
           minWidth: 200,
           minHeight: 100,
           ...style,
@@ -206,15 +206,15 @@ export default function DraggablePanel({
             alignItems: 'center',
             gap: 8,
             padding: '6px 12px',
-            background: 'var(--bg-secondary, #181825)',
-            borderBottom: '1px solid var(--border, #45475a)',
+            background: 'var(--bg-panel)',
+            borderBottom: '1px solid var(--border-default)',
             borderRadius: '6px 6px 0 0',
             cursor: 'move',
             userSelect: 'none',
             flexShrink: 0,
           }}
         >
-          <span style={{ fontSize: 12, color: 'var(--text-secondary, #a6adc8)', display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
+          <span style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
             {icon}
             {title}
           </span>
@@ -226,7 +226,7 @@ export default function DraggablePanel({
             style={{
               background: 'none',
               border: 'none',
-              color: 'var(--text-muted, #6c7086)',
+              color: 'var(--text-muted)',
               cursor: 'pointer',
               fontSize: 14,
               padding: '2px 6px',
@@ -244,7 +244,7 @@ export default function DraggablePanel({
             style={{
               background: 'none',
               border: 'none',
-              color: 'var(--text-muted, #6c7086)',
+              color: 'var(--text-muted)',
               cursor: 'pointer',
               fontSize: 14,
               padding: '2px 6px',
@@ -284,14 +284,14 @@ export default function DraggablePanel({
           alignItems: 'center',
           gap: 8,
           padding: '6px 12px',
-          background: 'var(--bg-secondary, #181825)',
-          borderBottom: '1px solid var(--border, #45475a)',
+          background: 'var(--bg-panel)',
+          borderBottom: '1px solid var(--border-default)',
           cursor: 'move',
           userSelect: 'none',
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 12, color: 'var(--text-secondary, #a6adc8)', display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
+        <span style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
           {icon}
           {title}
         </span>
@@ -303,7 +303,7 @@ export default function DraggablePanel({
           style={{
             background: 'none',
             border: 'none',
-            color: 'var(--text-muted, #6c7086)',
+            color: 'var(--text-muted)',
             cursor: 'pointer',
             fontSize: 14,
             padding: '2px 6px',

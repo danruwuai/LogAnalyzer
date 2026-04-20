@@ -420,15 +420,15 @@ export default function App() {
           alignItems: 'center', justifyContent: 'center', zIndex: 2000,
         }} onClick={() => setShowJumpToLine(false)}>
           <div style={{
-            background: '#1e1e2e', border: '1px solid #45475a',
+            background: 'var(--bg-surface)', border: '1px solid var(--border-default)',
             borderRadius: 8, padding: 16, width: 300,
           }} onClick={e => e.stopPropagation()}>
-            <div style={{ marginBottom: 8, color: '#a6adc8', fontSize: 13 }}>跳转到行号:</div>
+            <div style={{ marginBottom: 8, color: 'var(--text-secondary)', fontSize: 13 }}>跳转到行号:</div>
             <input
               autoFocus
               style={{
-                width: '100%', padding: '8px 10px', border: '1px solid #45475a',
-                borderRadius: 6, background: '#313244', color: '#cdd6f4',
+                width: '100%', padding: '8px 10px', border: '1px solid var(--border-default)',
+                borderRadius: 6, background: 'var(--bg-elevated)', color: 'var(--text-primary)',
                 fontSize: 14, outline: 'none', boxSizing: 'border-box',
               }}
               value={jumpLineNum}
@@ -446,7 +446,7 @@ export default function App() {
               <button className="toolbar-btn" onClick={() => { setShowJumpToLine(false); setJumpLineNum(''); }}>取消</button>
               <button className="toolbar-btn" onClick={() => {
                 if (jumpLineNum) { jumpToLine(parseInt(jumpLineNum)); setShowJumpToLine(false); setJumpLineNum(''); }
-              }} style={{ background: '#89b4fa', color: '#1e1e2e' }}>跳转</button>
+              }} style={{ background: 'var(--highlight-2)', color: 'var(--bg-canvas)' }}>跳转</button>
             </div>
           </div>
         </div>
@@ -480,7 +480,7 @@ export default function App() {
                     className="panel-title-btn panel-fullscreen-btn"
                     onClick={() => handlePanelFullscreen('log-full')}
                     title="全屏 (Ctrl+Shift+L)"
-                    style={{ background: 'none', border: 'none', color: 'var(--text-muted, #6c7086)', cursor: 'pointer', fontSize: 14, padding: '2px 6px', borderRadius: 3, display: 'flex', alignItems: 'center' }}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: '2px 6px', borderRadius: 3, display: 'flex', alignItems: 'center' }}
                   >
                     ⛶
                   </button>
@@ -724,7 +724,7 @@ function FilterPanelInline({ filterItems, onFilterItemsChange, filterMode, onFil
       <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
         <button className={`toolbar-btn small ${filterMode === 'filter' ? 'active' : ''}`} onClick={() => onFilterModeChange('filter')}>过滤模式</button>
         <button className={`toolbar-btn small ${filterMode === 'show-all' ? 'active' : ''}`} onClick={() => onFilterModeChange('show-all')}>全显模式</button>
-        <span style={{ fontSize: 11, color: '#6c7086' }}>匹配: {filterItems.filter(i => i.enabled).length} 条件</span>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>匹配: {filterItems.filter(i => i.enabled).length} 条件</span>
       </div>
       <div className="filter-inline-list">
         {filterItems.map(item => (
@@ -741,7 +741,7 @@ function FilterPanelInline({ filterItems, onFilterItemsChange, filterMode, onFil
             <button className="filter-inline-btn" onClick={() => removeItem(item.id)} title="删除">×</button>
           </div>
         ))}
-        {filterItems.length === 0 && <div style={{ color: '#6c7086', fontSize: 12, padding: '8px 0' }}>在搜索框输入关键字后按回车添加过滤</div>}
+        {filterItems.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: '8px 0' }}>在搜索框输入关键字后按回车添加过滤</div>}
       </div>
     </div>
   );
@@ -861,7 +861,7 @@ function ChartPanelInline({ lines, extractors, chartData: chartDataProp, onAddEx
           <>
             <button className="toolbar-btn small" onClick={() => {
               if (!chartInstance.current) return;
-              const url = chartInstance.current.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#1e1e2e' });
+              const url = chartInstance.current.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#0a0a0b' });
               const a = document.createElement('a');
               a.href = url; a.download = 'chart.png'; a.click();
             }}>保存图表</button>
@@ -890,12 +890,12 @@ function ChartPanelInline({ lines, extractors, chartData: chartDataProp, onAddEx
             const max = Math.max(...vals).toFixed(2);
             const avg = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(2);
             return (
-              <div key={ext.name} style={{ background: '#181825', padding: '2px 8px', borderRadius: 4, borderLeft: `3px solid ${ext.color}` }}>
+              <div key={ext.name} style={{ background: 'var(--bg-panel)', padding: '2px 8px', borderRadius: 4, borderLeft: `3px solid ${ext.color}` }}>
                 <span style={{ color: ext.color, fontWeight: 600 }}>{ext.name}</span>
-                <span style={{ color: '#6c7086', marginLeft: 6 }}>min:{min}</span>
-                <span style={{ color: '#6c7086' }}> max:{max}</span>
-                <span style={{ color: '#6c7086' }}> avg:{avg}</span>
-                <span style={{ color: '#6c7086' }}> n:{vals.length}</span>
+                <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>min:{min}</span>
+                <span style={{ color: 'var(--text-muted)' }}> max:{max}</span>
+                <span style={{ color: 'var(--text-muted)' }}> avg:{avg}</span>
+                <span style={{ color: 'var(--text-muted)' }}> n:{vals.length}</span>
               </div>
             );
           })}
@@ -904,10 +904,10 @@ function ChartPanelInline({ lines, extractors, chartData: chartDataProp, onAddEx
       <div ref={chartRef} style={{ width: '100%', height: 200, minHeight: 200, position: 'relative' }} />
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
         {extractors.map((ext, i) => (
-          <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, background: '#181825', padding: '2px 6px', borderRadius: 4, borderLeft: `3px solid ${ext.color}` }}>
-            <input style={{ width: 70, fontSize: 11, background: '#1e1e2e', border: '1px solid #45475a', color: '#cdd6f4', borderRadius: 3, padding: '1px 4px' }}
+          <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, background: 'var(--bg-panel)', padding: '2px 6px', borderRadius: 4, borderLeft: `3px solid ${ext.color}` }}>
+            <input style={{ width: 70, fontSize: 11, background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-primary)', borderRadius: 3, padding: '1px 4px' }}
               value={ext.name} onChange={e => onUpdateExtractor(i, 'name', e.target.value)} placeholder="名称" />
-            <input style={{ width: 100, fontSize: 11, background: '#1e1e2e', border: '1px solid #45475a', color: '#cdd6f4', borderRadius: 3, padding: '1px 4px' }}
+            <input style={{ width: 100, fontSize: 11, background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-primary)', borderRadius: 3, padding: '1px 4px' }}
               value={ext.regex} onChange={e => onUpdateExtractor(i, 'regex', e.target.value)} placeholder="正则 (分组1)" />
             <input type="color" value={ext.color} onChange={e => onUpdateExtractor(i, 'color', e.target.value)} style={{ width: 20, height: 20, border: 'none', cursor: 'pointer' }} />
             <button style={{ background: 'none', border: 'none', color: '#f38ba8', cursor: 'pointer', fontSize: 14 }} onClick={() => onRemoveExtractor(i)}>×</button>
@@ -920,11 +920,11 @@ function ChartPanelInline({ lines, extractors, chartData: chartDataProp, onAddEx
 
 function AnnotationsPanelInline({ annotations, onRemoveAnnotation, onJumpToLine }) {
   const entries = Object.entries(annotations);
-  if (entries.length === 0) return <div style={{ color: '#6c7086', fontSize: 12, padding: 8 }}>右键日志行添加注释</div>;
+  if (entries.length === 0) return <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: 8 }}>右键日志行添加注释</div>;
   return (
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', maxHeight: 150, overflow: 'auto' }}>
       {entries.map(([lineNum, text]) => (
-        <div key={lineNum} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, background: '#181825', padding: '3px 8px', borderRadius: 4, cursor: 'pointer' }}
+        <div key={lineNum} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, background: 'var(--bg-panel)', padding: '3px 8px', borderRadius: 4, cursor: 'pointer' }}
           onClick={() => onJumpToLine(parseInt(lineNum))}>
           <span style={{ color: '#89b4fa' }}>L{lineNum}</span>
           <span>{text}</span>
@@ -942,17 +942,17 @@ function ConfigPanelInline({ profiles, onSaveProfile, onLoadProfile, onDeletePro
       <div style={{ display: 'flex', gap: 8, marginBottom: 8, alignItems: 'center' }}>
         <input className="toolbar-input" style={{ width: 150 }} placeholder="配置名称" value={name} onChange={e => setName(e.target.value)} />
         <button className="toolbar-btn small" onClick={() => { if (name.trim()) { onSaveProfile(name.trim()); setName(''); } }}>保存当前配置</button>
-        <span style={{ fontSize: 11, color: '#6c7086' }}>{filterItems.length} 过滤 + {extractors.length} 指标</span>
+        <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{filterItems.length} 过滤 + {extractors.length} 指标</span>
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {profiles.map((p, i) => (
-          <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, background: '#181825', padding: '3px 8px', borderRadius: 4 }}>
-            <span style={{ color: '#a6e3a1', cursor: 'pointer' }} onClick={() => onLoadProfile(p)}>{p.name}</span>
-            <span style={{ color: '#6c7086' }}>({p.filterItems?.length || 0}F+{p.extractors?.length || 0}C)</span>
+          <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, background: 'var(--bg-panel)', padding: '3px 8px', borderRadius: 4 }}>
+            <span style={{ color: 'var(--highlight-3)', cursor: 'pointer' }} onClick={() => onLoadProfile(p)}>{p.name}</span>
+            <span style={{ color: 'var(--text-muted)' }}>({p.filterItems?.length || 0}F+{p.extractors?.length || 0}C)</span>
             <button style={{ background: 'none', border: 'none', color: '#f38ba8', cursor: 'pointer' }} onClick={() => onDeleteProfile(i)}>×</button>
           </div>
         ))}
-        {profiles.length === 0 && <div style={{ color: '#6c7086', fontSize: 12 }}>保存配置可一键恢复过滤器和图表设置</div>}
+        {profiles.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>保存配置可一键恢复过滤器和图表设置</div>}
       </div>
     </div>
   );

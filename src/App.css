@@ -1,11 +1,47 @@
 :root {
-  --bg-primary: #1e1e2e;
-  --bg-secondary: #181825;
-  --bg-tertiary: #313244;
-  --text-primary: #cdd6f4;
-  --text-secondary: #a6adc8;
-  --text-muted: #6c7086;
-  --border: #45475a;
+  /* ==== DESIGN.md Linear Dark Theme Variables ==== */
+  /* Background Layers */
+  --bg-canvas: #0a0a0b;      /* Marketing Black - canvas */
+  --bg-panel: #0f1011;       /* Panel Dark - sidebar/panels */
+  --bg-surface: #191a1b;     /* Level 3 - cards/containers */
+  --bg-elevated: #28282c;    /* Elevated - hover/secondary */
+  --bg-overlay: #1e1e24;     /* Overlay - dropdowns/modals */
+
+  /* Border Layers */
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.12);
+
+  /* Text Layers */
+  --text-primary: #f7f8f8;    /* Primary text */
+  --text-secondary: #d0d6e0;  /* Secondary text */
+  --text-tertiary: #8a8f98;   /* Tertiary/metadata */
+  --text-muted: #62666d;      /* Muted/disabled */
+
+  /* Highlight Colors (semantic) */
+  --highlight-1: #cba6f7;     /* Purple - highlight 1 */
+  --highlight-2: #89b4fa;     /* Blue - highlight 2 */
+  --highlight-3: #a6e3a1;     /* Green - highlight 3 */
+  --highlight-4: #f9e2af;     /* Yellow - highlight 4 */
+  --highlight-5: #f38ba8;     /* Red - highlight 5 */
+  --highlight-6: #fab387;     /* Orange - highlight 6 */
+
+  /* Status Colors */
+  --status-success: #10b981;
+  --status-warning: #f59e0b;
+  --status-error: #ef4444;
+  --status-info: #3b82f6;
+
+  /* Brand Colors */
+  --brand-primary: #5e6ad2;
+  --brand-accent: #7170ff;
+  --brand-hover: #828fff;
+
+  /* Legacy aliases for backward compat */
+  --bg-primary: #0a0a0b;
+  --bg-secondary: #0f1011;
+  --bg-tertiary: #191a1b;
+  --border: rgba(255, 255, 255, 0.08);
   --accent: #89b4fa;
   --green: #a6e3a1;
   --yellow: #f9e2af;
@@ -23,7 +59,7 @@
 
 body {
   font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
-  background: var(--bg-primary);
+  background: var(--bg-canvas);
   color: var(--text-primary);
   overflow: hidden;
 }
@@ -34,33 +70,36 @@ body {
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-default);
   flex-shrink: 0;
 }
 
 .toolbar-btn {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
   padding: 4px 12px;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 12px;
   display: flex;
   align-items: center;
   gap: 4px;
-  transition: background 0.15s;
+  transition: all 0.15s;
+  font-weight: 510;
 }
 
 .toolbar-btn:hover {
-  background: var(--border);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  border-color: var(--border-strong);
 }
 
 .toolbar-btn.active {
-  background: var(--accent);
-  color: var(--bg-primary);
-  border-color: var(--accent);
+  background: var(--brand-primary);
+  color: #ffffff;
+  border-color: var(--brand-primary);
 }
 
 .toolbar-btn.small {
@@ -69,19 +108,21 @@ body {
 }
 
 .toolbar-input {
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-default);
   color: var(--text-primary);
-  padding: 4px 8px;
-  border-radius: 4px;
+  padding: 6px 10px;
+  border-radius: 6px;
   font-size: 12px;
   outline: none;
   flex: 1;
   max-width: 300px;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .toolbar-input:focus {
-  border-color: var(--accent);
+  border-color: rgba(113, 112, 255, 0.5);
+  box-shadow: 0 0 0 3px rgba(113, 112, 255, 0.15);
 }
 
 .toolbar-separator {
@@ -155,8 +196,8 @@ body {
   align-items: center;
   gap: 12px;
   padding: 4px 12px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-default);
   font-size: 12px;
   color: var(--text-secondary);
   flex-shrink: 0;
@@ -261,13 +302,13 @@ body {
 /* Context menu */
 .context-menu {
   position: fixed;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 6px;
   padding: 4px 0;
   min-width: 160px;
   z-index: 1000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-lg);
 }
 
 .context-menu-item {
@@ -281,14 +322,14 @@ body {
 }
 
 .context-menu-item:hover {
-  background: var(--bg-tertiary);
+  background: var(--bg-elevated);
 }
 
 /* Bottom panel */
 .bottom-panel-toggle {
   flex-shrink: 0;
-  border-top: 1px solid var(--border);
-  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-default);
+  background: var(--bg-panel);
 }
 
 .bottom-panel-tabs {
@@ -315,14 +356,14 @@ body {
 }
 
 .bottom-panel-tab.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
+  color: var(--brand-accent);
+  border-bottom-color: var(--brand-accent);
 }
 
 .bottom-panel-content {
   flex-shrink: 0;
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border);
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-default);
   padding: 8px 12px;
   max-height: 280px;
   overflow: auto;
@@ -341,7 +382,7 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
-  background: var(--bg-primary);
+  background: var(--bg-surface);
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 12px;
@@ -381,8 +422,8 @@ body {
   align-items: center;
   gap: 16px;
   padding: 3px 12px;
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border);
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-default);
   font-size: 11px;
   color: var(--text-muted);
   flex-shrink: 0;
@@ -397,7 +438,7 @@ body {
 .status-bar-separator {
   width: 1px;
   height: 12px;
-  background: var(--border);
+  background: var(--border-default);
 }
 
 /* Help overlay */
@@ -412,8 +453,8 @@ body {
 }
 
 .help-overlay-content {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
   border-radius: 8px;
   padding: 16px;
   min-width: 350px;
@@ -440,8 +481,8 @@ body {
 }
 
 .help-shortcut kbd {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
   border-radius: 3px;
   padding: 1px 6px;
   font-size: 11px;
@@ -461,7 +502,7 @@ body {
 .panel-fullscreen {
   display: flex;
   flex-direction: column;
-  background: var(--bg-primary);
+  background: var(--bg-canvas);
 }
 
 /* Chart fullscreen: chart fills main content area */
@@ -482,30 +523,30 @@ body {
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-default);
   flex-shrink: 0;
 }
 
 /* Tab bar in fullscreen mode (mini, at bottom) */
 .chart-fullscreen-tabs {
   flex-shrink: 0;
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border);
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-default);
   padding: 0 4px;
 }
 
 /* Fullscreen toggle button */
 .panel-fullscreen-btn:hover {
-  background: var(--bg-tertiary) !important;
-  color: var(--accent) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: var(--brand-accent) !important;
 }
 
 /* Exit fullscreen button */
 .exit-fullscreen {
-  background: var(--bg-tertiary) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 4px !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--border-default) !important;
+  border-radius: 6px !important;
   padding: 2px 10px !important;
   font-size: 12px !important;
   color: var(--text-secondary) !important;
@@ -516,7 +557,7 @@ body {
 }
 
 .exit-fullscreen:hover {
-  background: var(--border) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
   color: var(--text-primary) !important;
 }
 
@@ -527,7 +568,7 @@ body {
 
 /* Draggable Panel */
 .panel-title-btn:hover {
-  background: var(--bg-tertiary) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
   color: var(--text-primary) !important;
 }
 

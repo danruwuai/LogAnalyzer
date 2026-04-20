@@ -208,7 +208,7 @@ const LogPanel = forwardRef(function LogPanel({
         matches.push({
           start: idx, end: idx + term.length,
           text: text.substring(idx, idx + term.length),
-          bgColor: 'rgba(249, 226, 175, 0.3)', fgColor: '#f9e2af',
+          bgColor: 'rgba(249, 226, 175, 0.3)', fgColor: 'var(--highlight-4)',
           fontColor: '', priority: 0,
         });
         idx += term.length;
@@ -319,11 +319,11 @@ const LogPanel = forwardRef(function LogPanel({
       <div className="log-panel-header">
         <span>日志 ({lines.length.toLocaleString()} 行)</span>
         {highlightFilters.length > 0 && (
-          <span style={{ color: '#a6e3a1' }}>
+          <span style={{ color: 'var(--highlight-3)' }}>
             {highlightFilters.length} 个关键字高亮
           </span>
         )}
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: '#6c7086' }}>
+        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
           右键添加注释 | 点击行号添加书签
         </span>
       </div>
@@ -374,7 +374,7 @@ const LogPanel = forwardRef(function LogPanel({
                   className="log-line-number"
                   onClick={() => onToggleBookmark(line.num)}
                   title={isBookmarked ? '取消书签' : '添加书签'}
-                  style={{ cursor: 'pointer', color: isBookmarked ? '#f9e2af' : undefined, minWidth: lineNumWidth }}
+                  style={{ cursor: 'pointer', color: isBookmarked ? 'var(--highlight-4)' : undefined, minWidth: lineNumWidth }}
                 >
                   {isBookmarked ? <Icons.Star filled /> : line.num}
                   {hasAnnotation && <Icons.Note />}
@@ -436,20 +436,20 @@ const LogPanel = forwardRef(function LogPanel({
         }} onClick={() => setEditingAnnotation(null)}>
           <div
             style={{
-              background: '#1e1e2e', border: '1px solid #45475a',
+              background: 'var(--bg-surface)', border: '1px solid var(--border-default)',
               borderRadius: 8, padding: 16, width: 400,
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ marginBottom: 8, color: '#a6adc8', fontSize: 13 }}>
+            <div style={{ marginBottom: 8, color: 'var(--text-secondary)', fontSize: 13 }}>
               行 {editingAnnotation} 的注释:
             </div>
             <textarea
               autoFocus
               rows={3}
               style={{
-                width: '100%', padding: '8px 10px', border: '1px solid #45475a',
-                borderRadius: 6, background: '#313244', color: '#cdd6f4',
+                width: '100%', padding: '8px 10px', border: '1px solid var(--border-default)',
+                borderRadius: 6, background: 'var(--bg-elevated)', color: 'var(--text-primary)',
                 fontSize: 13, outline: 'none', boxSizing: 'border-box',
                 resize: 'vertical', minHeight: 60, fontFamily: 'inherit',
               }}
@@ -463,7 +463,7 @@ const LogPanel = forwardRef(function LogPanel({
             />
             <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
               <button className="toolbar-btn" onClick={() => setEditingAnnotation(null)}>取消</button>
-              <button className="toolbar-btn" onClick={submitAnnotation} style={{ background: '#89b4fa', color: '#1e1e2e' }}>
+              <button className="toolbar-btn" onClick={submitAnnotation} style={{ background: 'var(--highlight-2)', color: 'var(--bg-canvas)' }}>
                 保存
               </button>
             </div>
