@@ -648,6 +648,32 @@ export default function App() {
         fileName={fileName}
         searchMatchCount={searchMatchCount}
         onJumpToLine={() => setShowJumpToLine(true)}
+        onExportFilter={() => {
+          const data = JSON.stringify({ filterItems, searchTerm }, null, 2);
+          const blob = new Blob([data], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url; a.download = 'filter.json'; a.click();
+          URL.revokeObjectURL(url);
+        }}
+        onImportFilter={() => {
+          const input = document.createElement('input');
+          input.type = 'file'; input.accept = '.json';
+          input.onchange = e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => {
+              try {
+                const obj = JSON.parse(ev.target.result);
+                if (obj.filterItems) setFilterItems(obj.filterItems);
+                if (obj.searchTerm) setSearchTerm(obj.searchTerm);
+              } catch (err) { alert('Invalid file'); }
+            };
+            reader.readAsText(file);
+          };
+          input.click();
+        }}
       />
 
       {/* Jump to line dialog */}
