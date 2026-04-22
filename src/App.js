@@ -5,6 +5,8 @@ import LogPanel from './components/LogPanel';
 import StatusBar from './components/StatusBar';
 import DraggablePanel from './components/DraggablePanel';
 import TimelineOverview from './components/TimelineOverview';
+import FileTabs from './components/FileTabs';
+import ConvergenceThresholdPanel from './components/ConvergenceThresholdPanel';
 import { Icons } from './components/Icons';
 import { logAnalyzerTheme } from './components/echarts-theme';
 
@@ -241,6 +243,15 @@ export default function App() {
     setActiveFileId(fileId);
   }, []);
 
+  const handleReorderFiles = useCallback((fromIndex, toIndex) => {
+    setFiles(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  }, []);
+
   // Save annotations
   const saveAnnotations = useCallback(async (newAnnotations) => {
     if (filePath) await window.api.saveAnnotations(filePath, newAnnotations);
@@ -320,6 +331,7 @@ export default function App() {
 
   const [showJumpToLine, setShowJumpToLine] = useState(false);
   const [jumpLineNum, setJumpLineNum] = useState('');
+  const [showThresholdPanel, setShowThresholdPanel] = useState(false);
 
   // Search match count (memoized for performance, cap at 50k lines)
   const searchMatchCount = React.useMemo(() => {
@@ -335,6 +347,14 @@ export default function App() {
 
   // Convergence detection state
   const [convergenceState, setConvergenceState] = useState('analyzing'); // 'analyzing' | 'converging' | 'diverging' | 'stable'
+
+  // Convergence threshold config (for threshold panel)
+  const [convergenceThresholdConfig, setConvergenceThresholdConfig] = useState({
+    windowSize: 50,
+    peakRatio: 0.6,
+    stableThreshold: 3,
+    enabled: true,
+  });
 
   // Convergence detection: analyze WARN/ERROR trends
   React.useEffect(() => {
@@ -395,6 +415,7 @@ export default function App() {
       if (e.ctrlKey && e.shiftKey && e.key === 'C') { e.preventDefault(); setFilterItems([]); }
       if (e.key === 'F1') { e.preventDefault(); setShowHelp(prev => !prev); }
       if (e.ctrlKey && e.key === '/') { e.preventDefault(); setShowHelp(prev => !prev); }
+      if (e.ctrlKey && e.key === 't') { e.preventDefault(); setShowThresholdPanel(prev => !prev); }
       // F3 / Shift+F3 - search navigation
       if (e.key === 'F3' && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
@@ -612,6 +633,17 @@ export default function App() {
       )}
 
       {loading && <div className="loading-bar"><div className="loading-bar-inner" /></div>}
+
+      {/* Multi-file tabs */}
+      {files.length > 0 && (
+        <FileTabs
+          files={files}
+          activeFileId={activeFileId}
+          onSelectFile={handleSetActiveFile}
+          onRemoveFile={handleRemoveFile}
+          onReorderFiles={handleReorderFiles}
+        />
+      )}
 
       {lines.length === 0 && !loading ? (
         <div className="empty-state">
@@ -845,7 +877,23 @@ export default function App() {
         annotationCount={Object.keys(annotations).length}
         onExportFiltered={handleExportFiltered} filterMode={filterMode}
         convergenceState={convergenceState}
+        convergenceThresholdConfig={convergenceThresholdConfig}
+        onShowThresholdPanel={() => setShowThresholdPanel(v => !v)}
       />
+
+      {showThresholdPanel && (
+        <div style={{
+          position: 'fixed',
+          bottom: 32,
+          right: 12,
+          zIndex: 500,
+        }}>
+          <ConvergenceThresholdPanel
+            config={convergenceThresholdConfig}
+            onChange={setConvergenceThresholdConfig}
+          />
+        </div>
+      )}
 
       {showHelp && (
         <div className="help-overlay" onClick={() => setShowHelp(false)}>

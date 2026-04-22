@@ -4,7 +4,8 @@ import { Icons } from './Icons';
 export default function StatusBar({
   totalLines, filteredLines, fileSize, filePath,
   bookmarkCount, annotationCount, onExportFiltered, filterMode,
-  convergenceState,
+  convergenceState, convergenceThresholdConfig,
+  onShowThresholdPanel,
 }) {
   const formatSize = (bytes) => {
     if (bytes < 1024) return bytes + ' B';
@@ -41,8 +42,15 @@ export default function StatusBar({
         </span>
       )}
       <span>{formatSize(fileSize)}</span>
-      <span className="status-convergence" style={{ color: stateLabel.color, fontWeight: 600 }}>
+      <span className="status-convergence" style={{ color: stateLabel.color, fontWeight: 600, cursor: 'pointer' }}
+        onClick={onShowThresholdPanel ? () => onShowThresholdPanel() : undefined}
+        title="点击设置收敛阈值">
         <span style={{ fontSize: 13 }}>{stateLabel.icon}</span> {stateLabel.label}
+        {convergenceThresholdConfig && (
+          <span style={{ fontSize: 10, opacity: 0.6, marginLeft: 4 }}>
+            W{convergenceThresholdConfig.windowSize} P{(convergenceThresholdConfig.peakRatio * 100).toFixed(0)}%
+          </span>
+        )}
       </span>
       {bookmarkCount > 0 && (
         <span className="status-bookmark"><Icons.Star filled /> {bookmarkCount}</span>
