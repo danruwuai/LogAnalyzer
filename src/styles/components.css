@@ -234,6 +234,18 @@
   border-left: 2px solid var(--status-warning);
 }
 
+/* INFO 行 */
+.log-row.level-info {
+  background: rgba(59, 130, 246, 0.04);
+  border-left: 2px solid var(--status-info);
+}
+
+/* DEBUG 行 */
+.log-row.level-debug {
+  background: rgba(113, 112, 255, 0.04);
+  border-left: 2px solid var(--brand-accent);
+}
+
 /* 书签行 */
 .log-row.bookmarked {
   background: rgba(113, 112, 255, 0.06);

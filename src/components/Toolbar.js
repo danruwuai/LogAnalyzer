@@ -17,6 +17,9 @@ export default function Toolbar({
   compareMode,
   onRemoveFile,
   onToggleCompareMode,
+  // Import/Export filter
+  onExportFilter,
+  onImportFilter,
 }) {
   const handleSearchKey = (e) => {
     if (e.key === 'Enter') onSearch();
@@ -78,6 +81,13 @@ export default function Toolbar({
       </div>
       <button className="toolbar-btn" onClick={onJumpToLine} title="跳转到行 (Ctrl+G)">
         ↦ 行号
+      </button>
+      <div className="toolbar-separator" />
+      <button className="toolbar-btn" onClick={onImportFilter} title="导入筛选条件">
+        <Icons.Import /> 导入
+      </button>
+      <button className="toolbar-btn" onClick={onExportFilter} title="导出筛选条件">
+        <Icons.Export /> 导出
       </button>
       {fileName && <span className="file-info"><Icons.File /> {fileName}</span>}
     </div>

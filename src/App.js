@@ -126,6 +126,37 @@ export default function App() {
     return results;
   }, [lines, extractors]);
 
+  // Export filters to .logfilter file
+  const exportFilters = useCallback(async () => {
+    const config = {
+      filterItems: filterItems.map(({ id, ...rest }) => rest),
+      filterMode,
+      extractors,
+      xAxisMode,
+      xAxisField,
+      thresholds,
+      version: '1.0',
+      timestamp: Date.now(),
+    };
+    const result = await window.api.saveFilterFile(config);
+    return result;
+  }, [filterItems, filterMode, extractors, xAxisMode, xAxisField, thresholds]);
+
+  // Import filters from .logfilter file
+  const importFilters = useCallback(async () => {
+    const result = await window.api.loadFilterFile();
+    if (!result.success) return;
+    const config = result.config;
+    if (config.filterItems) {
+      setFilterItems(config.filterItems.map(item => ({ ...item, id: Date.now() + Math.random() })));
+    }
+    if (config.filterMode) setFilterMode(config.filterMode);
+    if (config.extractors) setExtractors(config.extractors);
+    if (config.xAxisMode) setXAxisMode(config.xAxisMode);
+    if (config.xAxisField) setXAxisField(config.xAxisField);
+    if (config.thresholds) setThresholds(config.thresholds);
+  }, []);
+
   // Saved profiles (unified: filters + extractors + thresholds)
   const [profiles, setProfiles] = useState(() => {
     try {
@@ -453,9 +484,10 @@ export default function App() {
           if (firstVisible != null) toggleBookmark(firstVisible);
         }
       }
-      // Ctrl+Shift+L - log fullscreen toggle
+      // Ctrl+Shift+L - log fullscreen toggle (sync with maximizedPanel)
       if (e.ctrlKey && e.shiftKey && e.key === 'L') {
         e.preventDefault();
+        setMaximizedPanel(prev => prev === 'log' ? null : 'log');
         setPanelMode(prev => prev === 'log-full' ? 'split' : 'log-full');
       }
       // Escape - exit any fullscreen mode
@@ -506,6 +538,8 @@ export default function App() {
     if (window.api?.onMenuOpenFile) window.api.onMenuOpenFile(() => handleOpenFile());
     if (window.api?.onMenuSwitchTab) window.api.onMenuSwitchTab((tab) => { setBottomPanel(tab); setShowBottomPanel(true); });
     if (window.api?.onMenuHelp) window.api.onMenuHelp(() => setShowHelp(prev => !prev));
+    if (window.api?.onMenuExportFilters) window.api.onMenuExportFilters(() => exportFilters());
+    if (window.api?.onMenuImportFilters) window.api.onMenuImportFilters(() => importFilters());
 
     return () => {
       if (window.api?.removeAllListeners) {
@@ -514,9 +548,11 @@ export default function App() {
         window.api.removeAllListeners('menu:openFile');
         window.api.removeAllListeners('menu:switchTab');
         window.api.removeAllListeners('menu:help');
+        window.api.removeAllListeners('menu:exportFilters');
+        window.api.removeAllListeners('menu:importFilters');
       }
     };
-  }, [handleOpenFile]);
+  }, [handleOpenFile, exportFilters, importFilters]);
 
   // File drop
   const handleDrop = useCallback(async (e) => {

@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased] - Sprint 4
+
+### Added
+- **Ctrl+Shift+L 与 maximizedPanel 状态同步**
+  - 键盘快捷键 Ctrl+Shift+L 触发时同步更新 maximizedPanel 状态
+  - 确保全屏切换时 maximizedPanel 状态一致
+
+- **筛选方案导入导出（.logfilter）**
+  - `exportFilters()` / `importFilters()` 函数
+  - JSON 格式，.logfilter 文件扩展名
+  - 文件菜单新增「导出筛选方案」和「导入筛选方案」
+  - 支持筛选条件、图表配置、阈值线完整导出
+
 ## [Unreleased] - Sprint 3
 
 ### Fixed

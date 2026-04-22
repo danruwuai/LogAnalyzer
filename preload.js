@@ -35,6 +35,10 @@ contextBridge.exposeInMainWorld('api', {
   saveCSV: (filePath, content) =>
     ipcRenderer.invoke('export:saveCSV', { filePath, content }),
 
+  // Filter file export/import (.logfilter)
+  saveFilterFile: (config) => ipcRenderer.invoke('filters:save', config),
+  loadFilterFile: () => ipcRenderer.invoke('filters:load'),
+
   // Cleanup helper
   removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
 });

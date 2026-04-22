@@ -27,6 +27,9 @@ function createWindow() {
       submenu: [
         { label: '打开文件', accelerator: 'CmdOrCtrl+O', click: () => mainWindow.webContents.send('menu:openFile') },
         { type: 'separator' },
+        { label: '导出筛选方案', click: () => mainWindow.webContents.send('menu:exportFilters') },
+        { label: '导入筛选方案', click: () => mainWindow.webContents.send('menu:importFilters') },
+        { type: 'separator' },
         { label: '退出', accelerator: 'Alt+F4', click: () => app.quit() },
       ],
     },
@@ -242,6 +245,42 @@ ipcMain.handle('export:saveCSV', async (_, { filePath, content }) => {
   try {
     fs.writeFileSync(filePath, content, 'utf-8');
     return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// Filter file save (.logfilter)
+ipcMain.handle('filters:save', async (_, config) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: 'filter.logfilter',
+    filters: [
+      { name: 'Filter File', extensions: ['logfilter'] },
+    ],
+  });
+  if (result.canceled) return { success: false, error: 'Canceled' };
+  try {
+    await fs.promises.writeFile(result.filePath, JSON.stringify(config, null, 2), 'utf-8');
+    return { success: true, filePath: result.filePath };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+});
+
+// Filter file load (.logfilter)
+ipcMain.handle('filters:load', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'Filter File', extensions: ['logfilter'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+  });
+  if (result.canceled) return { success: false, error: 'Canceled' };
+  try {
+    const data = await fs.promises.readFile(result.filePaths[0], 'utf-8');
+    const config = JSON.parse(data);
+    return { success: true, config };
   } catch (err) {
     return { success: false, error: err.message };
   }
