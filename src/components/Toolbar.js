@@ -10,6 +10,13 @@ export default function Toolbar({
   fileName,
   searchMatchCount,
   onJumpToLine,
+  // Multi-file support
+  files,
+  activeFileId,
+  onSetActiveFile,
+  compareMode,
+  onRemoveFile,
+  onToggleCompareMode,
 }) {
   const handleSearchKey = (e) => {
     if (e.key === 'Enter') onSearch();
@@ -20,6 +27,41 @@ export default function Toolbar({
       <button className="toolbar-btn" onClick={onOpenFile} disabled={loading}>
         <Icons.Folder /> 打开
       </button>
+      {files.length > 0 && (
+        <>
+          <div className="toolbar-separator" />
+          {/* File tabs */}
+          <div className="toolbar-file-tabs">
+            {files.map(file => (
+              <div
+                key={file.id}
+                className={`toolbar-file-tab ${file.id === activeFileId ? 'active' : ''}`}
+                onClick={() => onSetActiveFile(file.id)}
+              >
+                <Icons.File />
+                <span className="toolbar-file-tab-name">{file.name}</span>
+                <button
+                  className="toolbar-file-tab-close"
+                  onClick={(e) => { e.stopPropagation(); onRemoveFile(file.id); }}
+                  title="关闭"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          {/* Compare mode toggle */}
+          {files.length > 1 && (
+            <button
+              className={`toolbar-btn small ${compareMode ? 'active' : ''}`}
+              onClick={onToggleCompareMode}
+              title="多文件对比模式"
+            >
+              <Icons.Compare /> 对比
+            </button>
+          )}
+        </>
+      )}
       <div className="toolbar-separator" />
       <div className="toolbar-search">
         <Icons.Search />

@@ -584,3 +584,74 @@ body {
   from { transform: scale(0.95); opacity: 0.8; }
   to { transform: scale(1); opacity: 1; }
 }
+
+/* Timeline Overview */
+.timeline-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: var(--bg-panel);
+  border-top: 1px solid var(--border-default);
+  height: 40px;
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.timeline-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  font-family: 'Cascadia Code', monospace;
+}
+
+.timeline-density-bar {
+  flex: 1;
+  height: 24px;
+  background: var(--bg-surface);
+  border-radius: 4px;
+  display: flex;
+  gap: 1px;
+  padding: 2px;
+  position: relative;
+  overflow: hidden;
+}
+
+.bar-segment {
+  flex: 1;
+  border-radius: 2px;
+  transition: opacity 0.15s;
+  min-width: 2px;
+}
+
+.bar-segment:hover { opacity: 0.8; }
+
+.bar-segment.blank { background: rgba(255,255,255,0.05); }
+.bar-segment.has-info { background: rgba(137,180,250,0.4); }
+.bar-segment.has-warn { background: rgba(245,158,11,0.5); }
+.bar-segment.has-error { background: rgba(239,68,68,0.6); }
+
+.timeline-viewport {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(137,180,250,0.15);
+  border: 1px solid rgba(137,180,250,0.5);
+  border-radius: 3px;
+  cursor: grab;
+  z-index: 2;
+}
+
+.timeline-viewport:active { cursor: grabbing; }
+
+/* Convergence badge in timeline */
+.timeline-convergence-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid currentColor;
+  flex-shrink: 0;
+}

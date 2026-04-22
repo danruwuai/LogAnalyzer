@@ -117,6 +117,19 @@ const LogPanel = forwardRef(function LogPanel({
       const idx = Math.floor(containerRef.current.scrollTop / LINE_HEIGHT);
       return lines[idx]?.num ?? null;
     },
+    getVisibleRange: () => {
+      if (!containerRef.current || lines.length === 0) return { start: 0, end: 0 };
+      const scrollTop = containerRef.current.scrollTop;
+      const height = containerRef.current.clientHeight;
+      const startIdx = Math.floor(scrollTop / LINE_HEIGHT);
+      const endIdx = Math.min(lines.length - 1, Math.floor((scrollTop + height) / LINE_HEIGHT));
+      return {
+        start: lines[startIdx]?.num ?? 0,
+        end: lines[endIdx]?.num ?? 0,
+      };
+    },
+    getScrollTop: () => containerRef.current?.scrollTop ?? 0,
+    scrollTo: (scrollTop) => { if (containerRef.current) containerRef.current.scrollTop = scrollTop; },
   }), [lines, containerHeight, searchTerm]);
 
   // Dynamic line number width based on total lines

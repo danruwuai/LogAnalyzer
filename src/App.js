@@ -6,11 +6,11 @@ import StatusBar from './components/StatusBar';
 import DraggablePanel from './components/DraggablePanel';
 import TimelineOverview from './components/TimelineOverview';
 import { Icons } from './components/Icons';
-import { logAnalyzerTheme } from './components/echarts-theme'; /* DESIGN.md ECharts 暗色主题 (P1) */
+import { logAnalyzerTheme } from './components/echarts-theme';
 
 const COLORS = ['#89b4fa', '#a6e3a1', '#f9e2af', '#f38ba8', '#fab387', '#cba6f7', '#94e2d5'];
 
-// Error boundary to catch render crashes
+// Error boundary
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
@@ -28,23 +28,31 @@ class ErrorBoundary extends React.Component {
 }
 
 export default function App() {
-  // File state
-  const [filePath, setFilePath] = useState(null);
-  const [fileName, setFileName] = useState('');
-  const [lines, setLines] = useState([]);
-  const [totalLines, setTotalLines] = useState(0);
-  const [fileSize, setFileSize] = useState(0);
+  // File state - multi-file support
+  const [files, setFiles] = useState([]); // [{id, path, name, lines, totalLines, fileSize, bookmarks, annotations}]
+  const [activeFileId, setActiveFileId] = useState(null);
+  const [compareMode, setCompareMode] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Search & filter - TextAnalysisTool style
+  // Current active file
+  const activeFile = files.find(f => f.id === activeFileId) || null;
+  const lines = activeFile?.lines || [];
+  const filePath = activeFile?.path || null;
+  const fileName = activeFile?.name || '';
+  const totalLines = activeFile?.totalLines || 0;
+  const fileSize = activeFile?.fileSize || 0;
+
+  // Search & filter
   const [searchTerm, setSearchTerm] = useState('');
   const [filterItems, setFilterItems] = useState([]);
   const [filterMode, setFilterMode] = useState('filter');
   const [timeRange, setTimeRange] = useState({ start: '', end: '' });
 
   // Bookmarks & annotations
-  const [bookmarks, setBookmarks] = useState(new Set());
-  const [annotations, setAnnotations] = useState({});
+  const [fileBookmarks, setFileBookmarks] = useState(new Set());
+  const [fileAnnotations, setFileAnnotations] = useState({});
+  const bookmarks = activeFile?.bookmarks || fileBookmarks;
+  const annotations = activeFile?.annotations || fileAnnotations;
 
   // Chart extractors
   const [extractors, setExtractors] = useState([]);
@@ -53,39 +61,15 @@ export default function App() {
   const [thresholds, setThresholds] = useState([]);
   const [chartLinkedLine, setChartLinkedLine] = useState(null);
 
-  // Bottom panel (unified: filter + chart + config)
+  // Bottom panel
   const [bottomPanel, setBottomPanel] = useState('filter');
   const [showBottomPanel, setShowBottomPanel] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
 
-  // Panel mode (replaces maximizedPanel)
-  // 'split' | 'log-full' | 'chart-full' | 'annotations-full'
+  // Panel mode
   const [panelMode, setPanelMode] = useState('split');
   const [panelZIndex, setPanelZIndex] = useState({ log: 10, bottom: 10 });
   const topZRef = useRef(10);
-
-  // Handle fullscreen for any panel type
-  const handlePanelFullscreen = useCallback((panelType) => {
-    if (panelType === panelMode) {
-      setPanelMode('split');
-    } else {
-      setPanelMode(panelType);
-    }
-  }, [panelMode]);
-
-  // Backward compat: handleMaximize/handleRestore still used by DraggablePanel
-  const handleMaximize = useCallback((panelId) => {
-    // Map old maximizedPanel to new panelMode
-    if (panelId === 'log') setPanelMode('log-full');
-    else if (panelId === 'bottom') setPanelMode('chart-full'); // default to chart
-  }, []);
-  const handleRestore = useCallback(() => {
-    setPanelMode('split');
-  }, []);
-  const handleBringToFront = useCallback((panelId) => {
-    topZRef.current += 1;
-    setPanelZIndex(prev => ({ ...prev, [panelId]: topZRef.current }));
-  }, []);
 
   // Chart data - computed once at App level for reuse in fullscreen stats
   const chartData = React.useMemo(() => {
@@ -129,6 +113,32 @@ export default function App() {
   // Refs
   const logPanelRef = useRef(null);
 
+  // Timeline visible range state (updated via scroll sync)
+  const [timelineRange, setTimelineRange] = useState({ start: 0, end: 0 });
+
+  // Sync timeline range from LogPanel scroll
+  useEffect(() => {
+    const syncRange = () => {
+      if (logPanelRef.current?.getVisibleRange) {
+        const range = logPanelRef.current.getVisibleRange();
+        setTimelineRange(range);
+      }
+    };
+    // Poll every 200ms since LogPanel doesn't expose scroll events
+    const interval = setInterval(syncRange, 200);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Timeline viewport change handler
+  const handleTimelineViewportChange = useCallback((start, end) => {
+    if (!logPanelRef.current) return;
+    // Convert line number to scroll position
+    const startIdx = lines.findIndex(l => l.num === start);
+    if (startIdx >= 0 && logPanelRef.current.scrollTo) {
+      logPanelRef.current.scrollTo(startIdx * 21 - 400); // 21 = LINE_HEIGHT, 400 = half container
+    }
+  }, [lines]);
+
   // Save profiles to localStorage
   const saveProfiles = useCallback((newProfiles) => {
     setProfiles(newProfiles);
@@ -165,11 +175,71 @@ export default function App() {
     saveProfiles(profiles.filter((_, i) => i !== index));
   }, [profiles, saveProfiles]);
 
-  // Load file
+  // Load file(s) - supports multi-file
   const handleOpenFile = useCallback(async () => {
-    const path = await window.api.openFile();
-    if (path) await loadFileFromPath(path);
-  }, [loadFileFromPath]);
+    const paths = await window.api.openFiles();
+    if (!paths || paths.length === 0) return;
+    // Open first file immediately
+    const firstPath = paths[0];
+    const fileName = firstPath.split(/[/\\]/).pop();
+    const result = await window.api.readFull(firstPath);
+    const newFile = {
+      id: Date.now().toString(),
+      path: firstPath,
+      name: fileName,
+      lines: result.success ? result.lines : [],
+      totalLines: result.success ? result.totalLines : 0,
+      fileSize: result.success ? result.fileSize : 0,
+      bookmarks: new Set(),
+      annotations: {},
+    };
+    if (result.success) {
+      const annoResult = await window.api.loadAnnotations(firstPath);
+      if (annoResult.success) newFile.annotations = annoResult.annotations;
+    }
+    setFiles([newFile]);
+    setActiveFileId(newFile.id);
+    setLoading(false);
+    // Open remaining files without switching active
+    for (let i = 1; i < paths.length; i++) {
+      const p = paths[i];
+      const name = p.split(/[/\\]/).pop();
+      const res = await window.api.readFull(p);
+      const f = {
+        id: (Date.now() + i).toString(),
+        path: p, name,
+        lines: res.success ? res.lines : [],
+        totalLines: res.success ? res.totalLines : 0,
+        fileSize: res.success ? res.fileSize : 0,
+        bookmarks: new Set(),
+        annotations: {},
+      };
+      if (res.success) {
+        const ar = await window.api.loadAnnotations(p);
+        if (ar.success) f.annotations = ar.annotations;
+      }
+      setFiles(prev => [...prev, f]);
+    }
+    if (paths.length > 1) setCompareMode(true);
+  }, []);
+
+  // Multi-file management
+  const handleRemoveFile = useCallback((fileId) => {
+    setFiles(prev => {
+      const next = prev.filter(f => f.id !== fileId);
+      if (activeFileId === fileId && next.length > 0) {
+        setActiveFileId(next[next.length - 1].id);
+      } else if (next.length === 0) {
+        setActiveFileId(null);
+        setCompareMode(false);
+      }
+      return next;
+    });
+  }, [activeFileId]);
+
+  const handleSetActiveFile = useCallback((fileId) => {
+    setActiveFileId(fileId);
+  }, []);
 
   // Save annotations
   const saveAnnotations = useCallback(async (newAnnotations) => {
@@ -177,15 +247,15 @@ export default function App() {
   }, [filePath]);
 
   const addAnnotation = useCallback((lineNum, text) => {
-    setAnnotations(prev => { const next = { ...prev, [lineNum]: text }; saveAnnotations(next); return next; });
+    setFileAnnotations(prev => { const next = { ...prev, [lineNum]: text }; saveAnnotations(next); return next; });
   }, [saveAnnotations]);
 
   const removeAnnotation = useCallback((lineNum) => {
-    setAnnotations(prev => { const next = { ...prev }; delete next[lineNum]; saveAnnotations(next); return next; });
+    setFileAnnotations(prev => { const next = { ...prev }; delete next[lineNum]; saveAnnotations(next); return next; });
   }, [saveAnnotations]);
 
   const toggleBookmark = useCallback((lineNum) => {
-    setBookmarks(prev => { const next = new Set(prev); next.has(lineNum) ? next.delete(lineNum) : next.add(lineNum); return next; });
+    setFileBookmarks(prev => { const next = new Set(prev); next.has(lineNum) ? next.delete(lineNum) : next.add(lineNum); return next; });
   }, []);
 
   // Extractor helpers
@@ -263,19 +333,51 @@ export default function App() {
     return count;
   }, [filteredLines, searchTerm]);
 
-  // Convergence statistics (computed from all lines, not filtered)
-  const convergenceStats = React.useMemo(() => {
-    if (lines.length === 0) return { converged: 0, diverged: 0, trend: 'stable' };
-    let converged = 0;
-    let diverged = 0;
-    for (const line of lines) {
-      const textLower = line.text.toLowerCase();
-      if (textLower.includes('isconverge=1')) converged++;
-      if (textLower.includes('isconverge=0')) diverged++;
+  // Convergence detection state
+  const [convergenceState, setConvergenceState] = useState('analyzing'); // 'analyzing' | 'converging' | 'diverging' | 'stable'
+
+  // Convergence detection: analyze WARN/ERROR trends
+  React.useEffect(() => {
+    if (lines.length === 0) { setConvergenceState('analyzing'); return; }
+    // Segment lines into time windows (every 50 lines = 1 window, max 50 windows)
+    const windowSize = 50;
+    const maxWindows = 50;
+    const windowCount = Math.min(Math.ceil(lines.length / windowSize), maxWindows);
+    const errorCounts = [];
+    for (let w = 0; w < windowCount; w++) {
+      const start = w * windowSize;
+      const end = Math.min(start + windowSize, lines.length);
+      let count = 0;
+      for (let i = start; i < end; i++) {
+        const t = lines[i].text.toLowerCase();
+        if (t.includes('error') || t.includes('exception') || t.includes('warn')) count++;
+      }
+      errorCounts.push(count);
     }
-    // Simple trend: if converged > diverged, converging
-    const trend = converged > diverged ? 'converging' : converged < diverged ? 'diverging' : 'stable';
-    return { converged, diverged, trend };
+    if (errorCounts.length < 3) { setConvergenceState('stable'); return; }
+    // Check: last window < previous window < ... < peak (3 consecutive decreases)
+    const peak = Math.max(...errorCounts);
+    const peakIdx = errorCounts.indexOf(peak);
+    const lastIdx = errorCounts.length - 1;
+    // If we are after the peak and error rate is declining
+    if (peakIdx < lastIdx - 1) {
+      let decreases = 0;
+      for (let i = peakIdx; i < lastIdx - 1; i++) {
+        if (errorCounts[i + 1] < errorCounts[i]) decreases++;
+      }
+      const recentAvg = (errorCounts[lastIdx] + errorCounts[Math.max(0, lastIdx-1)]) / 2;
+      if (decreases >= 2 && recentAvg < peak * 0.6) {
+        setConvergenceState('converging');
+      } else if (decreases === 0 && recentAvg > peak * 0.9) {
+        setConvergenceState('diverging');
+      } else {
+        setConvergenceState('stable');
+      }
+    } else if (peakIdx === lastIdx - 1 || peakIdx === lastIdx) {
+      setConvergenceState('diverging');
+    } else {
+      setConvergenceState('stable');
+    }
   }, [lines]);
 
   // Keyboard shortcuts
@@ -322,28 +424,27 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleOpenFile, toggleBookmark, panelMode]);
 
-  // Load file from path (shared logic, avoids duplication)
-  const loadFileFromPath = useCallback(async (fPath) => {
-    setLoading(true);
-    setFilePath(fPath);
-    setFileName(fPath.split(/[/\\]/).pop());
-    setLines([]); setBookmarks(new Set()); setAnnotations({}); setChartLinkedLine(null);
-    const result = await window.api.readFull(fPath);
-    if (result.success) {
-      setLines(result.lines);
-      setTotalLines(result.totalLines);
-      setFileSize(result.fileSize);
-      const annoResult = await window.api.loadAnnotations(fPath);
-      if (annoResult.success) setAnnotations(annoResult.annotations);
-    }
-    setLoading(false);
-  }, []);
-
   // Auto-load for demo & menu events
   useEffect(() => {
     if (window.api?.onAutoLoadFile) {
       window.api.onAutoLoadFile(async (filePath) => {
-        await loadFileFromPath(filePath);
+        const fileName = filePath.split(/[/\\]/).pop();
+        const result = await window.api.readFull(filePath);
+        const newFile = {
+          id: Date.now().toString(),
+          path: filePath, name: fileName,
+          lines: result.success ? result.lines : [],
+          totalLines: result.success ? result.totalLines : 0,
+          fileSize: result.success ? result.fileSize : 0,
+          bookmarks: new Set(),
+          annotations: {},
+        };
+        if (result.success) {
+          const ar = await window.api.loadAnnotations(filePath);
+          if (ar.success) newFile.annotations = ar.annotations;
+        }
+        setFiles([newFile]);
+        setActiveFileId(newFile.id);
         setFilterItems([
           { id: Date.now(), enabled: true, keyword: 'INFO', caseSensitive: false, isRegex: false, exclude: false, highlightRow: false, bgColor: 'rgba(137, 180, 250, 0.15)', fgColor: '#89b4fa', fontColor: '' },
           { id: Date.now()+1, enabled: true, keyword: 'WARN', caseSensitive: false, isRegex: false, exclude: false, highlightRow: true, bgColor: 'rgba(249, 226, 175, 0.15)', fgColor: '#f9e2af', fontColor: '' },
@@ -372,14 +473,56 @@ export default function App() {
         window.api.removeAllListeners('menu:help');
       }
     };
-  }, [handleOpenFile, loadFileFromPath]);
+  }, [handleOpenFile]);
 
   // File drop
-  const handleDrop = useCallback((e) => {
+  const handleDrop = useCallback(async (e) => {
     e.preventDefault();
-    const file = e.dataTransfer?.files?.[0];
-    if (file?.path) loadFileFromPath(file.path);
-  }, [loadFileFromPath]);
+    const droppedFiles = Array.from(e.dataTransfer?.files || []);
+    if (droppedFiles.length === 0) return;
+    // Load first dropped file
+    const firstFile = droppedFiles[0];
+    if (!firstFile.path) return;
+    const fileName = firstFile.path.split(/[/\\]/).pop();
+    const result = await window.api.readFull(firstFile.path);
+    const newFile = {
+      id: Date.now().toString(),
+      path: firstFile.path, name: fileName,
+      lines: result.success ? result.lines : [],
+      totalLines: result.success ? result.totalLines : 0,
+      fileSize: result.success ? result.fileSize : 0,
+      bookmarks: new Set(),
+      annotations: {},
+    };
+    if (result.success) {
+      const ar = await window.api.loadAnnotations(firstFile.path);
+      if (ar.success) newFile.annotations = ar.annotations;
+    }
+    setFiles([newFile]);
+    setActiveFileId(newFile.id);
+    // Load remaining dropped files
+    for (let i = 1; i < droppedFiles.length; i++) {
+      const f = droppedFiles[i];
+      if (!f.path) continue;
+      const name = f.path.split(/[/\\]/).pop();
+      const res = await window.api.readFull(f.path);
+      const ff = {
+        id: (Date.now() + i).toString(),
+        path: f.path, name,
+        lines: res.success ? res.lines : [],
+        totalLines: res.success ? res.totalLines : 0,
+        fileSize: res.success ? res.fileSize : 0,
+        bookmarks: new Set(),
+        annotations: {},
+      };
+      if (res.success) {
+        const ar = await window.api.loadAnnotations(f.path);
+        if (ar.success) ff.annotations = ar.annotations;
+      }
+      setFiles(prev => [...prev, ff]);
+    }
+    if (droppedFiles.length > 1) setCompareMode(true);
+  }, []);
 
   // Export filtered lines
   const handleExportFiltered = useCallback(() => {
@@ -525,10 +668,11 @@ export default function App() {
             <TimelineOverview
               lines={lines}
               totalLines={totalLines}
-              visibleStart={0}
-              visibleEnd={Math.min(lines.length, 1000)}
-              onViewportChange={(start, end) => console.log('viewport change', start, end)}
+              visibleStart={timelineRange.start}
+              visibleEnd={timelineRange.end}
+              onViewportChange={handleTimelineViewportChange}
               onJumpToLine={jumpToLine}
+              convergenceState={convergenceState}
             />
           )}
 
@@ -700,9 +844,7 @@ export default function App() {
         filePath={filePath} bookmarkCount={bookmarks.size}
         annotationCount={Object.keys(annotations).length}
         onExportFiltered={handleExportFiltered} filterMode={filterMode}
-        convergedCount={convergenceStats.converged}
-        divergedCount={convergenceStats.diverged}
-        convergenceTrend={convergenceStats.trend}
+        convergenceState={convergenceState}
       />
 
       {showHelp && (

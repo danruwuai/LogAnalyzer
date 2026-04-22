@@ -15,6 +15,7 @@ export default function TimelineOverview({
   visibleEnd,
   onViewportChange,
   onJumpToLine,
+  convergenceState,
 }) {
   // 计算密度分段
   const segments = useMemo(() => {
@@ -111,8 +112,20 @@ export default function TimelineOverview({
     );
   }
 
+  const convergenceLabel = {
+    converging: { text: '已收敛', color: 'var(--status-success)' },
+    diverging: { text: '发散中', color: 'var(--status-error)' },
+    stable: { text: '稳定', color: 'var(--text-muted)' },
+    analyzing: { text: '分析中', color: 'var(--text-muted)' },
+  }[convergenceState] || null;
+
   return (
     <div className="timeline-container" onClick={handleClick}>
+      {convergenceLabel && (
+        <span className="timeline-convergence-badge" style={{ color: convergenceLabel.color }}>
+          {convergenceLabel.text}
+        </span>
+      )}
       <span className="timeline-label start">L1</span>
       <div className="timeline-density-bar">
         {segments.map((seg) => (
