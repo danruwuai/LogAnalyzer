@@ -73,6 +73,28 @@ export default function App() {
   const [panelZIndex, setPanelZIndex] = useState({ log: 10, bottom: 10 });
   const topZRef = useRef(10);
 
+  // Maximized panel state (controlled by DraggablePanel callbacks)
+  const [maximizedPanel, setMaximizedPanel] = useState(null);
+  const handleMaximize = useCallback((panelId) => {
+    setMaximizedPanel(panelId);
+    if (panelId === 'log') setPanelMode('log-full');
+  }, []);
+  const handleRestore = useCallback(() => {
+    setMaximizedPanel(null);
+    if (panelMode !== 'split') setPanelMode('split');
+  }, [panelMode]);
+
+  // Fullscreen handler for bottom panel tabs
+  const handlePanelFullscreen = useCallback((mode) => {
+    setPanelMode(mode);
+  }, []);
+
+  // Bring panel to front
+  const handleBringToFront = useCallback((panelId) => {
+    topZRef.current += 1;
+    setPanelZIndex(prev => ({ ...prev, [panelId]: topZRef.current }));
+  }, []);
+
   // Chart data - computed once at App level for reuse in fullscreen stats
   const chartData = React.useMemo(() => {
     if (extractors.length === 0 || lines.length === 0) return null;
@@ -661,7 +683,7 @@ export default function App() {
                 title={`日志 ${filteredLines.length > 0 ? `(${filteredLines.length}行)` : ''}`}
                 icon={<Icons.File />}
                 panelId="log"
-                isMaximized={panelMode === 'log-full'}
+                isMaximized={maximizedPanel === 'log'}
                 onMaximize={handleMaximize}
                 onRestore={handleRestore}
                 zIndex={panelZIndex.log}
