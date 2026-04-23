@@ -21,6 +21,9 @@ export default function Toolbar({
   onExportFilter,
   onImportFilter,
 }) {
+// Multi-file support - safe default to empty array
+  const safeFiles = Array.isArray(files) ? files : [];
+
   const handleSearchKey = (e) => {
     if (e.key === 'Enter') onSearch();
   };
@@ -30,12 +33,12 @@ export default function Toolbar({
       <button className="toolbar-btn" onClick={onOpenFile} disabled={loading}>
         <Icons.Folder /> 打开
       </button>
-      {files.length > 0 && (
+      {safeFiles.length > 0 && (
         <>
           <div className="toolbar-separator" />
           {/* File tabs */}
           <div className="toolbar-file-tabs">
-            {files.map(file => (
+            {safeFiles.map(file => (
               <div
                 key={file.id}
                 className={`toolbar-file-tab ${file.id === activeFileId ? 'active' : ''}`}
@@ -54,7 +57,7 @@ export default function Toolbar({
             ))}
           </div>
           {/* Compare mode toggle */}
-          {files.length > 1 && (
+          {safeFiles.length > 1 && (
             <button
               className={`toolbar-btn small ${compareMode ? 'active' : ''}`}
               onClick={onToggleCompareMode}
