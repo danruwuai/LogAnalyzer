@@ -1,56 +1,5 @@
-:root {
-  /* ==== DESIGN.md Linear Dark Theme Variables ==== */
-  /* Background Layers */
-  --bg-canvas: #0a0a0b;      /* Marketing Black - canvas */
-  --bg-panel: #0f1011;       /* Panel Dark - sidebar/panels */
-  --bg-surface: #191a1b;     /* Level 3 - cards/containers */
-  --bg-elevated: #28282c;    /* Elevated - hover/secondary */
-  --bg-overlay: #1e1e24;     /* Overlay - dropdowns/modals */
-
-  /* Border Layers */
-  --border-subtle: rgba(255, 255, 255, 0.05);
-  --border-default: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.12);
-
-  /* Text Layers */
-  --text-primary: #f7f8f8;    /* Primary text */
-  --text-secondary: #d0d6e0;  /* Secondary text */
-  --text-tertiary: #8a8f98;   /* Tertiary/metadata */
-  --text-muted: #62666d;      /* Muted/disabled */
-
-  /* Highlight Colors (semantic) */
-  --highlight-1: #cba6f7;     /* Purple - highlight 1 */
-  --highlight-2: #89b4fa;     /* Blue - highlight 2 */
-  --highlight-3: #a6e3a1;     /* Green - highlight 3 */
-  --highlight-4: #f9e2af;     /* Yellow - highlight 4 */
-  --highlight-5: #f38ba8;     /* Red - highlight 5 */
-  --highlight-6: #fab387;     /* Orange - highlight 6 */
-
-  /* Status Colors */
-  --status-success: #10b981;
-  --status-warning: #f59e0b;
-  --status-error: #ef4444;
-  --status-info: #3b82f6;
-
-  /* Brand Colors */
-  --brand-primary: #5e6ad2;
-  --brand-accent: #7170ff;
-  --brand-hover: #828fff;
-
-  /* Legacy aliases for backward compat */
-  --bg-primary: #0a0a0b;
-  --bg-secondary: #0f1011;
-  --bg-tertiary: #191a1b;
-  --border: rgba(255, 255, 255, 0.08);
-  --accent: #89b4fa;
-  --green: #a6e3a1;
-  --yellow: #f9e2af;
-  --red: #f38ba8;
-  --peach: #fab387;
-  --mauve: #cba6f7;
-  --teal: #94e2d5;
-}
-
+/* Import design system variables - single source of truth */
+@import './styles/variables.css';
 * {
   margin: 0;
   padding: 0;
@@ -238,7 +187,7 @@ body {
 /* 书签行 — 品牌紫语义色 (DESIGN.md Section 7.1) */
 .log-line.bookmarked {
   background: rgba(113, 112, 255, 0.06);
-  border-left: 2px solid #7170ff;  /* --brand-accent */
+  border-left: 2px solid var(--brand-accent);  /* --brand-accent */
 }
 
 /* 图表关联行 */
@@ -254,23 +203,23 @@ body {
 /* ERROR 行 — 状态色语义 */
 .log-line.level-error {
   background: rgba(239, 68, 68, 0.08);
-  border-left: 2px solid #ef4444;  /* --status-error */
+  border-left: 2px solid var(--status-error);  /* --status-error */
 }
 
 /* WARN 行 — 状态色语义 */
 .log-line.level-warn {
   background: rgba(245, 158, 11, 0.06);
-  border-left: 2px solid #f59e0b;  /* --status-warning */
+  border-left: 2px solid var(--status-warning);  /* --status-warning */
 }
 
 /* 收敛行 — isConverge=1 */
 .log-line.converged {
-  border-left: 2px solid #10b981;  /* --status-success */
+  border-left: 2px solid var(--status-success);  /* --status-success */
 }
 
 /* 发散行 — isConverge=0 */
 .log-line.diverged {
-  border-left: 2px solid #ef4444;  /* --status-error */
+  border-left: 2px solid var(--status-error);  /* --status-error */
 }
 
 .log-line-number {
