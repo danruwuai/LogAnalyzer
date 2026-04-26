@@ -35,6 +35,8 @@ export default function App() {
   const [activeFileId, setActiveFileId] = useState(null);
   const [compareMode, setCompareMode] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounter = useRef(0);
 
   // Current active file
   const activeFile = files.find(f => f.id === activeFileId) || null;
@@ -554,29 +556,84 @@ export default function App() {
     };
   }, [handleOpenFile, exportFilters, importFilters]);
 
-  // File drop
+  // File drop handlers
+  const handleDragEnter = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current += 1;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current -= 1;
+    if (dragCounter.current === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
   const handleDrop = useCallback(async (e) => {
     e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounter.current = 0;
     const droppedFiles = Array.from(e.dataTransfer?.files || []);
     if (droppedFiles.length === 0) return;
+    setLoading(true);
     // Load first dropped file
     const firstFile = droppedFiles[0];
-    if (!firstFile.path) return;
-    const fileName = firstFile.path.split(/[/\\]/).pop();
-    const result = await window.api.readFull(firstFile.path);
+    let filePath = firstFile.path;
+    // Fallback: try to get path from text/uri-list (Electron drag may not set .path)
+    if (!filePath) {
+      const uriList = e.dataTransfer.getData('text/uri-list');
+      if (uriList) {
+        const uris = uriList.split('\n').map(u => u.trim()).filter(u => u.startsWith('file://'));
+        if (uris.length > 0) {
+          filePath = decodeURIComponent(uris[0].replace('file:///', '').replace('file://', ''));
+        }
+      }
+    }
+    if (!filePath) {
+      const types = e.dataTransfer.types.join(', ');
+      alert('无法获取文件路径，请使用"打开文件"按钮选择文件。\n拖拽内容类型: ' + types);
+      setLoading(false);
+      return;
+    }
+    // Validate file type
+    const fileName = filePath.split(/[\\/]/).pop();
+    const ext = fileName?.split('.').pop()?.toLowerCase();
+    const allowedExts = ['log', 'txt', 'csv', 'json'];
+    if (ext && !allowedExts.includes(ext)) {
+      alert(`不支持的文件类型: .${ext}\n支持的类型: ${allowedExts.join(', ')}`);
+      setLoading(false);
+      return;
+    }
+    const result = await window.api.readFull(filePath);
+    if (!result.success) {
+      alert(`文件加载失败: ${result.error}`);
+      setLoading(false);
+      return;
+    }
     const newFile = {
       id: Date.now().toString(),
-      path: firstFile.path, name: fileName,
-      lines: result.success ? result.lines : [],
-      totalLines: result.success ? result.totalLines : 0,
-      fileSize: result.success ? result.fileSize : 0,
+      path: filePath, name: fileName,
+      lines: result.lines,
+      totalLines: result.totalLines,
+      fileSize: result.fileSize,
       bookmarks: new Set(),
       annotations: {},
     };
-    if (result.success) {
-      const ar = await window.api.loadAnnotations(firstFile.path);
-      if (ar.success) newFile.annotations = ar.annotations;
-    }
+    const ar = await window.api.loadAnnotations(filePath);
+    if (ar.success) newFile.annotations = ar.annotations;
     setFiles([newFile]);
     setActiveFileId(newFile.id);
     // Load remaining dropped files
@@ -585,22 +642,25 @@ export default function App() {
       if (!f.path) continue;
       const name = f.path.split(/[/\\]/).pop();
       const res = await window.api.readFull(f.path);
+      if (!res.success) {
+        console.error(`文件 ${f.path} 加载失败:`, res.error);
+        continue;
+      }
       const ff = {
         id: (Date.now() + i).toString(),
         path: f.path, name,
-        lines: res.success ? res.lines : [],
-        totalLines: res.success ? res.totalLines : 0,
-        fileSize: res.success ? res.fileSize : 0,
+        lines: res.lines,
+        totalLines: res.totalLines,
+        fileSize: res.fileSize,
         bookmarks: new Set(),
         annotations: {},
       };
-      if (res.success) {
-        const ar = await window.api.loadAnnotations(f.path);
-        if (ar.success) ff.annotations = ar.annotations;
-      }
+      const ar2 = await window.api.loadAnnotations(f.path);
+      if (ar2.success) ff.annotations = ar2.annotations;
       setFiles(prev => [...prev, ff]);
     }
     if (droppedFiles.length > 1) setCompareMode(true);
+    setLoading(false);
   }, []);
 
   // Export filtered lines
@@ -616,8 +676,10 @@ export default function App() {
 
   return (
     <div
-      style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}
-      onDragOver={e => e.preventDefault()}
+      style={{ height: '100vh', display: 'flex', flexDirection: 'column', position: 'relative' }}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
       <Toolbar
@@ -675,6 +737,26 @@ export default function App() {
           input.click();
         }}
       />
+
+      {/* Drag & Drop overlay */}
+      {isDragging && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(137, 180, 250, 0.1)', border: '3px dashed var(--highlight-1)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 9999, pointerEvents: 'none',
+        }}>
+          <div style={{
+            background: 'var(--bg-surface)', border: '1px solid var(--border-default)',
+            borderRadius: 12, padding: '24px 48px',
+            fontSize: 18, color: 'var(--highlight-1)', fontWeight: 600,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+          }}>
+            <span style={{ fontSize: 24, marginRight: 12 }}>📂</span>
+            释放以打开文件
+          </div>
+        </div>
+      )}
 
       {/* Jump to line dialog */}
       {showJumpToLine && (
