@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('api', {
+const api = {
   // Dialog
   openFile: () => ipcRenderer.invoke('dialog:openFile'),
   openFiles: () => ipcRenderer.invoke('dialog:openFiles'),
@@ -41,4 +41,11 @@ contextBridge.exposeInMainWorld('api', {
 
   // Cleanup helper
   removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
-});
+};
+
+try {
+  contextBridge.exposeInMainWorld('api', api);
+  console.log('✅ preload: api exposed successfully');
+} catch (err) {
+  console.error('❌ preload: failed to expose api', err);
+}

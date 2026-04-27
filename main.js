@@ -66,10 +66,18 @@ function createWindow() {
     });
   }
 
-  // 打包后 __dirname 在 asar 内，只能加载 src/index.html；开发时用 webpack 输出的 dist/index.html
-  const indexPath = app.isPackaged
-    ? path.join(__dirname, 'src', 'index.html')
-    : path.join(__dirname, 'dist', 'index.html');
+  // 无论开发还是打包，都加载 webpack 打包后的 index.html
+  // 开发时：项目根目录/dist/index.html
+  // 打包后：resources/app/dist/index.html (通过 extraResources 复制)
+  const isPackaged = app.isPackaged;
+  let indexPath;
+  if (isPackaged) {
+    // 打包后：resources/app/dist/index.html
+    indexPath = path.join(process.resourcesPath, 'app', 'dist', 'index.html');
+  } else {
+    // 开发时：项目根目录/dist/index.html
+    indexPath = path.join(__dirname, 'dist', 'index.html');
+  }
   mainWindow.loadFile(indexPath);
 
   mainWindow.once('ready-to-show', () => {

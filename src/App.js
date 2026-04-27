@@ -30,6 +30,20 @@ class ErrorBoundary extends React.Component {
 }
 
 export default function App() {
+  // 预加载检查
+  if (!window.api) {
+    return (
+      <div style={{ padding: 20, color: '#f38ba8', background: '#1e1e2e', height: '100vh' }}>
+        <h3>⚠️ 应用加载异常</h3>
+        <p>预加载脚本未正确加载，请尝试：</p>
+        <ul>
+          <li>重新安装应用</li>
+          <li>检查杀毒软件是否拦截</li>
+          <li>联系开发团队</li>
+        </ul>
+      </div>
+    );
+  }
   // File state - multi-file support
   const [files, setFiles] = useState([]); // [{id, path, name, lines, totalLines, fileSize, bookmarks, annotations}]
   const [activeFileId, setActiveFileId] = useState(null);
