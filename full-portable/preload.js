@@ -39,12 +39,8 @@ const api = {
   saveFilterFile: (config) => ipcRenderer.invoke('filters:save', config),
   loadFilterFile: () => ipcRenderer.invoke('filters:load'),
 
-  // File drop handler - sends drag event data to main process for path extraction
-  getDroppedFilePaths: (uriList, fileNames) =>
-    ipcRenderer.invoke('file:getDroppedPaths', { uriList, fileNames }),
-
-  // File drop handler (from will-drop event)
-  onFileDropped: (callback) => ipcRenderer.on('file:dropped', (_, files) => callback(files)),
+  // Cleanup helper
+  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
 };
 
 try {

@@ -4,6 +4,35 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LogAnalyzer</title>
+  <script>
+    // Global drag-drop handler to prevent Electron from loading local files
+    // This must run before React mounts to catch all drag events
+    (function() {
+      document.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }, true);
+      
+      document.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }, true);
+      
+      document.addEventListener('dragenter', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }, true);
+      
+      document.addEventListener('dragleave', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }, true);
+    })();
+  </script>
 </head>
 <body>
   <div id="root"></div>

@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const readline = require('readline');
@@ -17,40 +17,39 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webSecurity: false,
     },
   });
 
   // Menu
   const menu = Menu.buildFromTemplate([
     {
-      label: '鏂囦欢',
+      label: '文件',
       submenu: [
-        { label: '鎵撳紑鏂囦欢', accelerator: 'CmdOrCtrl+O', click: () => mainWindow.webContents.send('menu:openFile') },
+        { label: '打开文件', accelerator: 'CmdOrCtrl+O', click: () => mainWindow.webContents.send('menu:openFile') },
         { type: 'separator' },
-        { label: '瀵煎嚭绛涢€夋柟妗?, click: () => mainWindow.webContents.send('menu:exportFilters') },
-        { label: '瀵煎叆绛涢€夋柟妗?, click: () => mainWindow.webContents.send('menu:importFilters') },
+        { label: '导出筛选方案', click: () => mainWindow.webContents.send('menu:exportFilters') },
+        { label: '导入筛选方案', click: () => mainWindow.webContents.send('menu:importFilters') },
         { type: 'separator' },
-        { label: '閫€鍑?, accelerator: 'Alt+F4', click: () => app.quit() },
+        { label: '退出', accelerator: 'Alt+F4', click: () => app.quit() },
       ],
     },
     {
-      label: '瑙嗗浘',
+      label: '视图',
       submenu: [
-        { label: '绛涢€夐潰锟?, accelerator: 'CmdOrCtrl+1', click: () => mainWindow.webContents.send('menu:switchTab', 'filter') },
-        { label: '鍥捐〃', accelerator: 'CmdOrCtrl+2', click: () => mainWindow.webContents.send('menu:switchTab', 'chart') },
-        { label: '娉ㄩ噴', accelerator: 'CmdOrCtrl+3', click: () => mainWindow.webContents.send('menu:switchTab', 'annotations') },
-        { label: '閰嶇疆', accelerator: 'CmdOrCtrl+4', click: () => mainWindow.webContents.send('menu:switchTab', 'config') },
+        { label: '筛选面板', accelerator: 'CmdOrCtrl+1', click: () => mainWindow.webContents.send('menu:switchTab', 'filter') },
+        { label: '图表', accelerator: 'CmdOrCtrl+2', click: () => mainWindow.webContents.send('menu:switchTab', 'chart') },
+        { label: '注释', accelerator: 'CmdOrCtrl+3', click: () => mainWindow.webContents.send('menu:switchTab', 'annotations') },
+        { label: '配置', accelerator: 'CmdOrCtrl+4', click: () => mainWindow.webContents.send('menu:switchTab', 'config') },
         { type: 'separator' },
-        { label: '寮€鍙戣€呭伐锟?, accelerator: 'F12', click: () => mainWindow.webContents.toggleDevTools() },
+        { label: '开发者工具', accelerator: 'F12', click: () => mainWindow.webContents.toggleDevTools() },
       ],
     },
     {
-      label: '甯姪',
+      label: '帮助',
       submenu: [
-        { label: '蹇嵎锟?, accelerator: 'F1', click: () => mainWindow.webContents.send('menu:help') },
+        { label: '快捷键', accelerator: 'F1', click: () => mainWindow.webContents.send('menu:help') },
         { type: 'separator' },
-        { label: '鍏充簬', click: () => dialog.showMessageBox(mainWindow, { title: 'LogAnalyzer', message: 'LogAnalyzer v1.0\n鍩轰簬 Electron + React + ECharts', type: 'info' }) },
+        { label: '关于', click: () => dialog.showMessageBox(mainWindow, { title: 'LogAnalyzer', message: 'LogAnalyzer v1.0\n基于 Electron + React + ECharts', type: 'info' }) },
       ],
     },
   ]);
@@ -67,13 +66,13 @@ function createWindow() {
     });
   }
 
-  // 鏃犺寮€鍙戣繕鏄墦鍖咃紝閮藉姞锟?webpack 鎵撳寘鍚庣殑 index.html
+  // 无论开发还是打包，都加载 webpack 打包后的 index.html
   let indexPath;
   if (app.isPackaged) {
-    // 鎵撳寘鍚庯細resources/app/dist/index.html
+    // 打包后：resources/app/dist/index.html (通过 extraResources 复制)
     indexPath = path.join(process.resourcesPath, 'app', 'dist', 'index.html');
   } else {
-    // 寮€鍙戞椂锛氶」鐩牴鐩綍/app/dist/index.html (webpack 杈撳嚭鐩綍)
+    // 开发时：项目根目录/app/dist/index.html (webpack 输出目录)
     indexPath = path.join(__dirname, 'app', 'dist', 'index.html');
   }
   mainWindow.loadFile(indexPath);
@@ -188,7 +187,7 @@ ipcMain.handle('file:readFull', async (_, filePath) => {
     const stat = await fs.promises.stat(filePath);
     const MAX_SIZE = 50 * 1024 * 1024; // 50MB limit
     if (stat.size > MAX_SIZE) {
-      return { success: false, error: `鏂囦欢杩囧ぇ (${(stat.size / 1024 / 1024).toFixed(1)}MB)锛岃浣跨敤娴佸紡鍔犺浇鎴栭€夋嫨灏忎簬 50MB 鐨勬枃浠禶 };
+      return { success: false, error: `文件过大 (${(stat.size / 1024 / 1024).toFixed(1)}MB)，请使用流式加载或选择小于 50MB 的文件` };
     }
     const content = await fs.promises.readFile(filePath, 'utf-8');
     const lines = content.split('\n').map((text, i) => ({ num: i + 1, text }));
@@ -217,7 +216,7 @@ ipcMain.handle('annotations:load', async (_, filePath) => {
       try {
         return { success: true, annotations: JSON.parse(data) };
       } catch {
-        return { success: true, annotations: {}, parseWarning: '娉ㄩ噴鏂囦欢鏍煎紡宸叉崯鍧忥紝宸查噸锟? };
+        return { success: true, annotations: {}, parseWarning: '注释文件格式已损坏，已重置' };
       }
     }
     return { success: true, annotations: {} };
@@ -291,43 +290,3 @@ ipcMain.handle('filters:load', async () => {
     return { success: false, error: err.message };
   }
 });
-
-// Handle file drop - extract paths from drag event data
-ipcMain.handle('file:getDroppedPaths', async (event, { uriList, fileNames }) => {
-  const paths = [];
-  
-  // Method 1: Parse text/uri-list
-  if (uriList) {
-    const uris = uriList.split('\n')
-      .map(u => u.trim())
-      .filter(u => u && !u.startsWith('#') && u.startsWith('file://'));
-    
-    for (const uri of uris) {
-      try {
-        let path = decodeURIComponent(uri);
-        // Remove file:// or file:/// prefix
-        if (path.startsWith('file:///')) {
-          path = path.slice(8);
-        } else if (path.startsWith('file://')) {
-          path = path.slice(7);
-        }
-        // On Windows, remove leading slash if present (e.g., /C:/ -> C:/)
-        if (/^\/[A-Za-z]:/.test(path)) {
-          path = path.slice(1);
-        }
-        paths.push(path);
-      } catch (err) {
-        console.error('Failed to parse URI:', uri, err);
-      }
-    }
-  }
-  
-  // Method 2: If uri-list failed, try to use fileNames (but we need full paths)
-  // This is a fallback - in most cases uri-list should work
-  if (paths.length === 0 && fileNames && fileNames.length > 0) {
-    console.warn('Could not extract paths from uri-list, file names:', fileNames);
-  }
-  
-  return { paths };
-});
-

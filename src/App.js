@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+﻿import React, { useState, useCallback, useRef, useEffect } from 'react';
 import * as echarts from 'echarts';
 import Toolbar from './components/Toolbar';
 import LogPanel from './components/LogPanel';
@@ -595,34 +595,98 @@ export default function App() {
     e.dataTransfer.dropEffect = 'copy';
   }, []);
 
+  // Helper: extract file paths from drop event (works in contextIsolation mode)
+  const getDroppedFilePaths = useCallback(async (e) => {
+    const paths = [];
+    
+    // Debug: log all available data types
+    console.log('Drop event types:', e.dataTransfer.types);
+    
+    // Method 1: Try text/uri-list (most reliable in Electron)
+    const uriList = e.dataTransfer.getData('text/uri-list');
+    console.log('text/uri-list:', uriList);
+    
+    if (uriList) {
+      const uris = uriList.split('\n')
+        .map(u => u.trim())
+        .filter(u => u && !u.startsWith('#') && u.startsWith('file://'));
+      
+      console.log('Parsed URIs:', uris);
+      
+      for (const uri of uris) {
+        try {
+          // Decode file:// URL to path
+          let path = decodeURIComponent(uri);
+          console.log('Decoded URI:', path);
+          
+          // Handle Windows file:///C:/path and Unix file:///path
+          if (path.startsWith('file:///')) {
+            path = path.slice(8); // Remove 'file:///'
+          } else if (path.startsWith('file://')) {
+            path = path.slice(7); // Remove 'file://'
+          }
+          
+          // On Windows, remove leading slash if present (e.g., /C:/ -> C:/)
+          if (/^\/[A-Za-z]:/.test(path)) {
+            path = path.slice(1);
+          }
+          
+          console.log('Final path:', path);
+          paths.push(path);
+        } catch (err) {
+          console.error('Failed to parse URI:', uri, err);
+        }
+      }
+    }
+    
+    // Method 2: Use IPC to main process for path extraction (more reliable)
+    if (paths.length === 0) {
+      console.log('Trying IPC method...');
+      try {
+        const fileNames = Array.from(e.dataTransfer.files || []).map(f => f.name);
+        const result = await window.api.getDroppedFilePaths(uriList, fileNames);
+        if (result.paths && result.paths.length > 0) {
+          paths.push(...result.paths);
+        }
+      } catch (err) {
+        console.error('IPC method failed:', err);
+      }
+    }
+    
+    // Method 3: Fallback - try to access .path directly (may not work in contextIsolation)
+    if (paths.length === 0 && e.dataTransfer.files?.length > 0) {
+      console.log('Trying direct .path access...');
+      for (const file of Array.from(e.dataTransfer.files)) {
+        if (file.path) {
+          paths.push(file.path);
+        }
+      }
+    }
+    
+    console.log('Final paths:', paths);
+    return paths;
+  }, []);
+
   const handleDrop = useCallback(async (e) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
     dragCounter.current = 0;
-    const droppedFiles = Array.from(e.dataTransfer?.files || []);
-    if (droppedFiles.length === 0) return;
-    setLoading(true);
-    // Load first dropped file
-    const firstFile = droppedFiles[0];
-    let filePath = firstFile.path;
-    // Fallback: try to get path from text/uri-list (Electron drag may not set .path)
-    if (!filePath) {
-      const uriList = e.dataTransfer.getData('text/uri-list');
-      if (uriList) {
-        const uris = uriList.split('\n').map(u => u.trim()).filter(u => u.startsWith('file://'));
-        if (uris.length > 0) {
-          filePath = decodeURIComponent(uris[0].replace('file:///', '').replace('file://', ''));
-        }
-      }
-    }
-    if (!filePath) {
-      const types = e.dataTransfer.types.join(', ');
+    
+    // Get file paths using the helper (now async)
+    const filePaths = await getDroppedFilePaths(e);
+    
+    if (filePaths.length === 0) {
+      const types = e.dataTransfer.types?.join(', ') || 'none';
       alert('无法获取文件路径，请使用"打开文件"按钮选择文件。\n拖拽内容类型: ' + types);
       setLoading(false);
       return;
     }
-    // Validate file type
+    
+    setLoading(true);
+    
+    // Validate and load first file
+    let filePath = filePaths[0];
     const fileName = filePath.split(/[\\/]/).pop();
     const ext = fileName?.split('.').pop()?.toLowerCase();
     const allowedExts = ['log', 'txt', 'csv', 'json'];
@@ -631,12 +695,14 @@ export default function App() {
       setLoading(false);
       return;
     }
+    
     const result = await window.api.readFull(filePath);
     if (!result.success) {
       alert(`文件加载失败: ${result.error}`);
       setLoading(false);
       return;
     }
+    
     const newFile = {
       id: Date.now().toString(),
       path: filePath, name: fileName,
@@ -650,32 +716,33 @@ export default function App() {
     if (ar.success) newFile.annotations = ar.annotations;
     setFiles([newFile]);
     setActiveFileId(newFile.id);
+    
     // Load remaining dropped files
-    for (let i = 1; i < droppedFiles.length; i++) {
-      const f = droppedFiles[i];
-      if (!f.path) continue;
-      const name = f.path.split(/[/\\]/).pop();
-      const res = await window.api.readFull(f.path);
+    for (let i = 1; i < filePaths.length; i++) {
+      const fp = filePaths[i];
+      const name = fp.split(/[\\/]/).pop();
+      const res = await window.api.readFull(fp);
       if (!res.success) {
-        console.error(`文件 ${f.path} 加载失败:`, res.error);
+        console.error(`文件 ${fp} 加载失败:`, res.error);
         continue;
       }
       const ff = {
         id: (Date.now() + i).toString(),
-        path: f.path, name,
+        path: fp, name,
         lines: res.lines,
         totalLines: res.totalLines,
         fileSize: res.fileSize,
         bookmarks: new Set(),
         annotations: {},
       };
-      const ar2 = await window.api.loadAnnotations(f.path);
+      const ar2 = await window.api.loadAnnotations(fp);
       if (ar2.success) ff.annotations = ar2.annotations;
       setFiles(prev => [...prev, ff]);
     }
-    if (droppedFiles.length > 1) setCompareMode(true);
+    
+    if (filePaths.length > 1) setCompareMode(true);
     setLoading(false);
-  }, []);
+  }, [getDroppedFilePaths]);
 
   // Export filtered lines
   const handleExportFiltered = useCallback(() => {
@@ -1358,3 +1425,4 @@ function ConfigPanelInline({ profiles, onSaveProfile, onLoadProfile, onDeletePro
     </div>
   );
 }
+
