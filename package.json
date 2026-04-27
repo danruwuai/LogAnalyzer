@@ -20,14 +20,9 @@
     "files": [
       "**/*",
       "!node_modules/**",
-      "!dist/win-unpacked/**"
+      "!dist/**"
     ],
-    "extraResources": [
-      {
-        "from": "dist",
-        "to": "dist"
-      }
-    ],
+    "extraResources": [],
     "win": {
       "target": [
         {
