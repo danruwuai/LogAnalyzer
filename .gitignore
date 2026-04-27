@@ -15,3 +15,8 @@ take-screenshot.ps1
 wait-and-screenshot.js
 codesign.pfx
 create-cert.ps1
+
+# Test outputs
+coverage/
+test-results/
+
