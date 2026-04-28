@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+  packages: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -22,18 +26,7 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Build and Package
-      run: npm run pack
-      env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          dist/LogAnalyzer-*.exe
-          dist/LogAnalyzer Setup *.exe
-        draft: false
-        prerelease: false
+    - name: Build and Package (with publish)
+      run: npx electron-builder --win --publish always
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

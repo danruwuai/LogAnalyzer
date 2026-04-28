@@ -19,13 +19,8 @@
     },
     "files": [
       "**/*",
-      "!node_modules/**"
-    ],
-    "extraResources": [
-      {
-        "from": "build",
-        "to": "build"
-      }
+      "!node_modules/**",
+      "!dist/**"
     ],
     "win": {
       "target": [
