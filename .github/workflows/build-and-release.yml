@@ -26,7 +26,19 @@ jobs:
     - name: Install dependencies
       run: npm ci
     
-    - name: Build and Package (with publish)
+    - name: Build and Package
       run: npx electron-builder --win --publish always
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Create ZIP archive
+      run: Compress-Archive -Path dist\win-unpacked\* -DestinationPath dist\LogAnalyzer-${{ github.ref_name }}-win64.zip
+    
+    - name: Upload ZIP to Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: dist\LogAnalyzer-${{ github.ref_name }}-win64.zip
+        draft: false
+        prerelease: false
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
