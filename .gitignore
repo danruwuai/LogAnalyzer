@@ -1,5 +1,6 @@
 node_modules/
-dist/
+# dist/  # 注释掉，允许跟踪exe安装包
+# dist/*.exe  # 允许跟踪dist下的exe文件，配合Git LFS
 *.log
 *.map
 *.png
