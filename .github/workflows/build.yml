@@ -17,6 +17,13 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Get package version
+        id: get_version
+        run: |
+          $version = node -p "require('./package.json').version"
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "Detected version: $version"
+
       - name: Install dependencies
         run: npm ci
 
@@ -27,15 +34,15 @@ jobs:
         run: npx electron-builder --win dir
 
       - name: Package portable zip
-        run: |
-          Compress-Archive -Path "dist\win-unpacked\*" -DestinationPath "dist\LogAnalyzer-1.0.0-portable.zip" -Force
+        run: Compress-Archive -Path "dist\win-unpacked\*" -DestinationPath "dist\LogAnalyzer-${{ steps.get_version.outputs.VERSION }}-portable.zip" -Force
 
       - name: Build NSIS installer (no signing)
         run: |
-          Remove-Item -Force "dist\LogAnalyzer Setup 1.0.0.exe" -ErrorAction SilentlyContinue
-          Compress-Archive -Path "dist\win-unpacked\*" -DestinationPath "dist\LogAnalyzer-1.0.0-setup.zip" -Force
+          $version = "${{ steps.get_version.outputs.VERSION }}"
+          Remove-Item -Force "dist\LogAnalyzer Setup $version.exe" -ErrorAction SilentlyContinue
+          Compress-Archive -Path "dist\win-unpacked\*" -DestinationPath "dist\LogAnalyzer-$version-setup.zip" -Force
           # Rename to exe for installer detection
-          Copy-Item "dist\LogAnalyzer-1.0.0-setup.zip" "dist\LogAnalyzer Setup 1.0.0.exe" -Force
+          Copy-Item "dist\LogAnalyzer-$version-setup.zip" "dist\LogAnalyzer Setup $version.exe" -Force
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
