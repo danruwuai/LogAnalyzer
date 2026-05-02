@@ -1,0 +1,54 @@
+name: Build
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Get package version
+        id: get_version
+        run: |
+          $version = node -p "require('./package.json').version"
+          echo "VERSION=$version" >> $env:GITHUB_OUTPUT
+          echo "Detected version: $version"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build webpack
+        run: npm run build
+
+      - name: Build unpacked app
+        run: npx electron-builder --win dir
+
+      - name: Package portable zip
+        run: Compress-Archive -Path "dist\win-unpacked\*" -DestinationPath "dist\LogAnalyzer-${{ steps.get_version.outputs.VERSION }}-portable.zip" -Force
+
+      - name: Build NSIS installer (no signing)
+        run: |
+          $version = "${{ steps.get_version.outputs.VERSION }}"
+          Remove-Item -Force "dist\LogAnalyzer Setup $version.exe" -ErrorAction SilentlyContinue
+          Compress-Archive -Path "dist\win-unpacked\*" -DestinationPath "dist\LogAnalyzer-$version-setup.zip" -Force
+          # Rename to exe for installer detection
+          Copy-Item "dist\LogAnalyzer-$version-setup.zip" "dist\LogAnalyzer Setup $version.exe" -Force
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: LogAnalyzer-exe
+          path: |
+            dist/*.exe
+            dist/*.zip
+          retention-days: 30

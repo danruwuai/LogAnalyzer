@@ -1,0 +1,34 @@
+node_modules/
+dist/
+build/
+full-portable/
+*.log
+*.map
+*.png
+test-window.js
+demo.html
+test-chart.html
+capture-app.ps1
+capture-isp-log.js
+find-browser.bat
+take-demo-screenshot.ps1
+take-screenshot.js
+wait-and-screenshot.js
+codesign.pfx
+create-cert.ps1
+*.backup
+logs/
+test-results/
+coverage/
+
+# Test outputs
+coverage/
+test-results/
+test-results/
+
+dist/
+
+# Large files
+*.exe
+*.zip
+full-portable/
