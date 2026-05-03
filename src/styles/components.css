@@ -494,6 +494,64 @@
 }
 
 /* ============================================
+   Sprint 2 - 多文件对比 Tab 增强样式
+   ============================================ */
+
+/* 对比模式指示器 - 左文件（蓝色） */
+.file-tab-compare-indicator.left {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--highlight-2);
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+/* 对比模式指示器 - 右文件（绿色） */
+.file-tab-compare-indicator.right {
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 2px;
+  background: var(--highlight-3);
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+/* 差异统计徽章 */
+.file-tab-diff-count {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 0 4px;
+  font-size: 10px;
+  color: var(--status-error);
+  flex-shrink: 0;
+  line-height: 16px;
+}
+
+/* 未保存状态 - 文件名后圆点 */
+.file-tab-unsaved::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--status-warning);
+  flex-shrink: 0;
+  margin-left: 4px;
+  align-self: center;
+}
+
+/* 对比模式下的Tab位置调整（为指示器留空间） */
+.file-tab.compare-left,
+.file-tab.compare-right {
+  padding-left: 8px;
+}
+
+/* ============================================
    Sprint 2 - 收敛检测阈值面板 (Threshold Panel)
    ============================================ */
 

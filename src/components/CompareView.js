@@ -1,44 +1,70 @@
-import React, { useMemo, useRef, useCallback, useState } from 'react';
+import React, { useMemo, useRef, useCallback, useState, useEffect } from 'react';
 import LogPanel from './LogPanel';
 
 /**
  * CompareView - 多文件对比视图组件
  * 并排显示两个文件的日志内容，高亮差异行
+ * Sprint 2: 改为受控组件，接受外部对比状态
  */
-const CompareView = ({ files, activeFileId, onSelectFile, filteredLines }) => {
-  // 状态：选择要对比的两个文件
-  const [selectedA, setSelectedA] = useState(null);
-  const [selectedB, setSelectedB] = useState(null);
+const CompareView = ({ 
+  files, 
+  activeFileId, 
+  onSelectFile, 
+  filteredLines,
+  compareLeftId,
+  compareRightId,
+  onCompareFilesChange,
+  onDiffCountChange
+}) => {
+  // 使用外部传入的对比文件ID，如果没有则使用默认值
+  const [internalLeftId, setInternalLeftId] = useState(null);
+  const [internalRightId, setInternalRightId] = useState(null);
+  
+  // 决定使用外部状态还是内部状态
+  const effectiveLeftId = compareLeftId !== undefined ? compareLeftId : internalLeftId;
+  const effectiveRightId = compareRightId !== undefined ? compareRightId : internalRightId;
   
   // 初始化：当文件列表变化时，自动选择前两个文件
   const compareFiles = useMemo(() => {
     if (!files || files.length < 2) return [null, null];
     
-    // 如果已选择文件，保持选择；否则选择前两个
-    const fileA = selectedA 
-      ? files.find(f => f.id === selectedA) 
+    // 使用有效的ID查找文件
+    const fileA = effectiveLeftId 
+      ? files.find(f => f.id === effectiveLeftId) 
       : files[0];
-    const fileB = selectedB 
-      ? files.find(f => f.id === selectedB) 
+    const fileB = effectiveRightId 
+      ? files.find(f => f.id === effectiveRightId) 
       : files.length > 1 ? files[1] : null;
       
     return [fileA, fileB];
-  }, [files, selectedA, selectedB]);
+  }, [files, effectiveLeftId, effectiveRightId]);
 
   const [fileA, fileB] = compareFiles;
 
   // 文件选择变更处理
   const handleFileAChange = useCallback((e) => {
     const newId = e.target.value;
-    setSelectedA(newId);
+    if (compareLeftId !== undefined && onCompareFilesChange) {
+      // 使用外部状态管理
+      onCompareFilesChange(newId, effectiveRightId);
+    } else {
+      // 使用内部状态管理
+      setInternalLeftId(newId);
+    }
     if (onSelectFile && newId) onSelectFile(newId);
-  }, [onSelectFile]);
+  }, [onSelectFile, compareLeftId, onCompareFilesChange, effectiveRightId]);
 
   const handleFileBChange = useCallback((e) => {
     const newId = e.target.value;
-    setSelectedB(newId);
+    if (compareRightId !== undefined && onCompareFilesChange) {
+      // 使用外部状态管理
+      onCompareFilesChange(effectiveLeftId, newId);
+    } else {
+      // 使用内部状态管理
+      setInternalRightId(newId);
+    }
     if (onSelectFile && newId) onSelectFile(newId);
-  }, [onSelectFile]);
+  }, [onSelectFile, compareRightId, onCompareFilesChange, effectiveLeftId]);
 
   // 同步滚动逻辑
   const scrollRefA = useRef(null);
@@ -112,6 +138,11 @@ const CompareView = ({ files, activeFileId, onSelectFile, filteredLines }) => {
   // 差异导航状态
   const [diffIndex, setDiffIndex] = useState(0);
   
+  // 当文件变化时重置差异导航索引
+  useEffect(() => {
+    setDiffIndex(0);
+  }, [fileA?.id, fileB?.id]);
+  
   // 跳转到上一个差异
   const gotoPrevDiff = useCallback(() => {
     if (diffInfo.positions.length === 0) return;
@@ -137,14 +168,24 @@ const CompareView = ({ files, activeFileId, onSelectFile, filteredLines }) => {
   // lineClassName函数，根据行返回CSS类
   const getLineClassNameA = (line, index) => {
     return diffInfo.lines[`A-${index}`] || '';
-  };
-  
+  };  
   const getLineClassNameB = (line, index) => {
     return diffInfo.lines[`B-${index}`] || '';
   };
 
   // 差异统计
   const diffCount = diffInfo.positions.length;
+  
+  // 当差异数量变化时，通知父组件
+  useEffect(() => {
+    if (onDiffCountChange) {
+      // 计算两个文件的差异数量
+      const diffCounts = {};
+      if (fileA) diffCounts[fileA.id] = diffCount;
+      if (fileB) diffCounts[fileB.id] = diffCount;
+      onDiffCountChange(diffCounts);
+    }
+  }, [diffCount, fileA?.id, fileB?.id, onDiffCountChange]);
 
   // 下拉菜单样式
   const selectStyle = {
@@ -183,10 +224,10 @@ const CompareView = ({ files, activeFileId, onSelectFile, filteredLines }) => {
           alignItems: 'center',
           gap: 8
         }}>
-          <span style={{ color: 'var(--highlight-1)' }}>📄 文件A:</span>
+          <span style={{ color: 'var(--highlight-2)' }}>📄 文件A:</span>
           {/* 文件选择下拉菜单 */}
           <select 
-            value={selectedA || fileA.id} 
+            value={effectiveLeftId || fileA.id} 
             onChange={handleFileAChange}
             style={selectStyle}
             title="选择文件A"
@@ -275,10 +316,10 @@ const CompareView = ({ files, activeFileId, onSelectFile, filteredLines }) => {
           alignItems: 'center',
           gap: 8
         }}>
-          <span style={{ color: 'var(--highlight-2)' }}>📄 文件B:</span>
+          <span style={{ color: 'var(--highlight-3)' }}>📄 文件B:</span>
           {/* 文件选择下拉菜单 */}
           <select 
-            value={selectedB || fileB.id} 
+            value={effectiveRightId || fileB.id} 
             onChange={handleFileBChange}
             style={selectStyle}
             title="选择文件B"

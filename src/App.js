@@ -49,6 +49,10 @@ export default function App() {
   const [files, setFiles] = useState([]); // [{id, path, name, lines, totalLines, fileSize, bookmarks, annotations}]
   const [activeFileId, setActiveFileId] = useState(null);
   const [compareMode, setCompareMode] = useState(false);
+  // Sprint 2: 对比模式文件状态
+  const [compareLeftId, setCompareLeftId] = useState(null);
+  const [compareRightId, setCompareRightId] = useState(null);
+  const [diffCounts, setDiffCounts] = useState({}); // {fileId: count}
   const [loading, setLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
@@ -114,6 +118,30 @@ export default function App() {
     topZRef.current += 1;
     setPanelZIndex(prev => ({ ...prev, [panelId]: topZRef.current }));
   }, []);
+
+  // Sprint 2: 对比文件状态管理
+  const handleCompareFilesChange = useCallback((leftId, rightId) => {
+    setCompareLeftId(leftId);
+    setCompareRightId(rightId);
+  }, []);
+
+  const handleDiffCountChange = useCallback((counts) => {
+    setDiffCounts(prev => ({ ...prev, ...counts }));
+  }, []);
+
+  // 当进入对比模式时，自动设置对比文件
+  useEffect(() => {
+    if (compareMode && files.length >= 2 && !compareLeftId && !compareRightId) {
+      setCompareLeftId(files[0].id);
+      setCompareRightId(files[1].id);
+    }
+    // 退出对比模式时清理
+    if (!compareMode) {
+      setCompareLeftId(null);
+      setCompareRightId(null);
+      setDiffCounts({});
+    }
+  }, [compareMode, files, compareLeftId, compareRightId]);
 
   // Chart data - computed once at App level for reuse in fullscreen stats
   const chartData = React.useMemo(() => {
@@ -899,6 +927,9 @@ export default function App() {
           onSelectFile={handleSetActiveFile}
           onRemoveFile={handleRemoveFile}
           onReorderFiles={handleReorderFiles}
+          compareLeftId={compareLeftId}
+          compareRightId={compareRightId}
+          diffCounts={diffCounts}
         />
       )}
 
@@ -920,6 +951,10 @@ export default function App() {
                   activeFileId={activeFileId}
                   onSelectFile={handleSetActiveFile}
                   filteredLines={filteredLines}
+                  compareLeftId={compareLeftId}
+                  compareRightId={compareRightId}
+                  onCompareFilesChange={handleCompareFilesChange}
+                  onDiffCountChange={handleDiffCountChange}
                 />
               ) : (
                 <DraggablePanel
