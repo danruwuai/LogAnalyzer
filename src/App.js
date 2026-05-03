@@ -460,10 +460,15 @@ export default function App() {
   // Convergence detection: analyze WARN/ERROR trends
   React.useEffect(() => {
     if (lines.length === 0) { setConvergenceState('analyzing'); return; }
-    // Segment lines into time windows (every 50 lines = 1 window, max 50 windows)
-    const windowSize = 50;
+    
+    const { windowSize, peakRatio, stableThreshold, enabled } = convergenceThresholdConfig;
+    if (!enabled) { setConvergenceState('stable'); return; }
+    
+    // Segment lines into time windows
     const maxWindows = 50;
     const windowCount = Math.min(Math.ceil(lines.length / windowSize), maxWindows);
+    if (windowCount < 2) { setConvergenceState('stable'); return; }
+    
     const errorCounts = [];
     for (let w = 0; w < windowCount; w++) {
       const start = w * windowSize;
@@ -475,31 +480,46 @@ export default function App() {
       }
       errorCounts.push(count);
     }
+    
     if (errorCounts.length < 3) { setConvergenceState('stable'); return; }
-    // Check: last window < previous window < ... < peak (3 consecutive decreases)
+    
+    // Find peak
     const peak = Math.max(...errorCounts);
     const peakIdx = errorCounts.indexOf(peak);
     const lastIdx = errorCounts.length - 1;
-    // If we are after the peak and error rate is declining
-    if (peakIdx < lastIdx - 1) {
+    
+    // If we are after the peak
+    if (peakIdx < lastIdx) {
+      // Count consecutive decreases after peak
       let decreases = 0;
-      for (let i = peakIdx; i < lastIdx - 1; i++) {
-        if (errorCounts[i + 1] < errorCounts[i]) decreases++;
+      let consecutiveDecreases = 0;
+      for (let i = peakIdx; i < lastIdx; i++) {
+        if (errorCounts[i + 1] < errorCounts[i]) {
+          decreases++;
+          consecutiveDecreases++;
+        } else {
+          consecutiveDecreases = 0;
+        }
       }
+      
+      // Calculate recent average (last 2 windows)
       const recentAvg = (errorCounts[lastIdx] + errorCounts[Math.max(0, lastIdx-1)]) / 2;
-      if (decreases >= 2 && recentAvg < peak * 0.6) {
+      const ratio = peak > 0 ? recentAvg / peak : 0;
+      
+      if (consecutiveDecreases >= stableThreshold && ratio < peakRatio) {
         setConvergenceState('converging');
-      } else if (decreases === 0 && recentAvg > peak * 0.9) {
+      } else if (decreases === 0 && recentAvg > peak * (1 - peakRatio * 0.5)) {
         setConvergenceState('diverging');
       } else {
         setConvergenceState('stable');
       }
-    } else if (peakIdx === lastIdx - 1 || peakIdx === lastIdx) {
+    } else if (peakIdx === lastIdx) {
+      // Peak is in the last window, might still be diverging
       setConvergenceState('diverging');
     } else {
       setConvergenceState('stable');
     }
-  }, [lines]);
+  }, [lines, convergenceThresholdConfig]);
 
   // Keyboard shortcuts
   useEffect(() => {
