@@ -17,10 +17,11 @@ module.exports = defineConfig({
     {
       name: 'electron',
       use: {
-        // Electron应用启动配置
+        // Electron应用启动配置 - 简化参数
         launchOptions: {
-          executablePath: path.join(__dirname, 'dist', 'LogAnalyzer-1.3.1-portable.exe'),
-          args: ['--no-sandbox'],
+          executablePath: path.join(__dirname, 'dist', 'LogAnalyzer-1.3.2-portable.exe'),
+          // 不传递任何额外标志，让应用使用自己的默认配置
+          args: [],
         },
       },
     },

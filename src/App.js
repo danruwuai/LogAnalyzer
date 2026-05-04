@@ -5,6 +5,7 @@ import LogPanel from './components/LogPanel';
 import StatusBar from './components/StatusBar';
 import DraggablePanel from './components/DraggablePanel';
 import TimelineOverview from './components/TimelineOverview';
+import ConvergenceStateVisualization from "./components/ConvergenceStateVisualization";
 import CompareView from './components/CompareView';
 import FileTabs from './components/FileTabs';
 import ConvergenceThresholdPanel from './components/ConvergenceThresholdPanel';
@@ -433,6 +434,9 @@ export default function App() {
   const [showJumpToLine, setShowJumpToLine] = useState(false);
   const [jumpLineNum, setJumpLineNum] = useState('');
   const [showThresholdPanel, setShowThresholdPanel] = useState(false);
+  const [showConvergenceVisualization, setShowConvergenceVisualization] = useState(false);
+
+
 
   // Search match count (memoized for performance, cap at 50k lines)
   const searchMatchCount = React.useMemo(() => {
@@ -1200,6 +1204,13 @@ export default function App() {
         convergenceState={convergenceState}
         convergenceThresholdConfig={convergenceThresholdConfig}
         onShowThresholdPanel={() => setShowThresholdPanel(v => !v)}
+        onShowVisualization={() => setShowConvergenceVisualization(v => !v)}
+      />
+      <ConvergenceStateVisualization
+        convergenceState={convergenceState}
+        convergenceThresholdConfig={convergenceThresholdConfig}
+        compact={true}
+        showDetails={false}
       />
 
       {showThresholdPanel && (
@@ -1208,6 +1219,23 @@ export default function App() {
           bottom: 32,
           right: 12,
           zIndex: 500,
+        }}>
+      {showConvergenceVisualization && (
+        <div style={{
+          position: 'fixed',
+          bottom: 32,
+          right: 12,
+          zIndex: 500,
+        }}>
+          <ConvergenceStateVisualization
+            convergenceState={convergenceState}
+            convergenceThresholdConfig={convergenceThresholdConfig}
+            compact={false}
+            showDetails={true}
+          />
+        </div>
+      )}
+
         }}>
           <ConvergenceThresholdPanel
             config={convergenceThresholdConfig}

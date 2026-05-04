@@ -6,6 +6,7 @@ export default function StatusBar({
   bookmarkCount, annotationCount, onExportFiltered, filterMode,
   convergenceState, convergenceThresholdConfig,
   onShowThresholdPanel,
+  onShowVisualization,
 }) {
   const formatSize = (bytes) => {
     if (bytes < 1024) return bytes + ' B';
@@ -46,6 +47,34 @@ export default function StatusBar({
         onClick={onShowThresholdPanel ? () => onShowThresholdPanel() : undefined}
         title="点击设置收敛阈值">
         <span style={{ fontSize: 13 }}>{stateLabel.icon}</span> {stateLabel.label}
+                {onShowVisualization && (
+          <button
+            className="status-visualization-btn"
+            onClick={onShowVisualization}
+            title="显示详细收敛分析"
+            style={{
+              marginLeft: '8px',
+              padding: '2px 6px',
+              background: 'var(--bg-elevated)',
+              border: '1px solid var(--border-default)',
+              borderRadius: 'var(--radius-sm)',
+              color: 'var(--text-secondary)',
+              fontSize: 11,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.target.style.background = 'var(--bg-hover)';
+              e.target.style.color = 'var(--text-primary)';
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = 'var(--bg-elevated)';
+              e.target.style.color = 'var(--text-secondary)';
+            }}
+          >
+            详情
+          </button>
+        )}
         {convergenceThresholdConfig && (
           <span style={{ fontSize: 10, opacity: 0.6, marginLeft: 4 }}>
             W{convergenceThresholdConfig.windowSize} P{(convergenceThresholdConfig.peakRatio * 100).toFixed(0)}%

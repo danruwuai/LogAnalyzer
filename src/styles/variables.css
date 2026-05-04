@@ -93,3 +93,10 @@
   --toolbar-height:  48px;  /* 工具栏高度 (Radix UI 标准) */
   --statusbar-height: 24px; /* 状态栏高度 */
 }
+
+
+/* ========== 动画 (Animations) ========== */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
