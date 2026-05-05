@@ -68,4 +68,17 @@ export default function ConvergenceStateVisualization({
 
       {showDetails && (
         <div style={{ height: 60, background: 'var(--bg-panel)', borderRadius: 'var(--radius-sm)', marginBottom: 16 }}>
-          <svg width=" 100% height=100%>
+          <svg width="100%" height="100%" viewBox="0 0 100 20" preserveAspectRatio="none">
+            {/* 简化占位可视化，实际可接入真实收敛趋势数据 */}
+            <path 
+              d="M0 20 Q25 10, 50 15 T100 20" 
+              fill="none" 
+              stroke={config.color} 
+              strokeWidth="2"
+            />
+          </svg>
+        </div>
+      )}
+    </div>
+  );
+}
