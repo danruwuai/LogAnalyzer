@@ -7,7 +7,7 @@ module.exports = {
     path: path.resolve(__dirname, 'dist'),
     filename: '[name].[contenthash].js',
     chunkFilename: '[name].[contenthash].js',
-    clean: true,
+    clean: false, // 禁用自动清理，避免与electron-builder生成的文件冲突
   },
   optimization: {
     splitChunks: {

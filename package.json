@@ -15,7 +15,7 @@
     "appId": "com.danruwuai.loganalyzer",
     "productName": "LogAnalyzer",
     "directories": {
-      "output": "dist"
+      "output": "dist-builder"
     },
     "asar": true,
     "files": [
