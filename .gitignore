@@ -32,3 +32,4 @@ dist/
 *.exe
 *.zip
 full-portable/
+dist-builder/

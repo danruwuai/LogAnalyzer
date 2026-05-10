@@ -6,11 +6,11 @@ import { Icons } from './Icons';
  * Linear/Apple-style tabs: dark background, close button on right, active tab highlighted
  * Enhanced with compare mode indicators and diff counts (Sprint 2)
  */
-export default function FileTabs({ 
-  files, 
-  activeFileId, 
-  onSelectFile, 
-  onRemoveFile, 
+export default function FileTabs({
+  files,
+  activeFileId,
+  onSelectFile,
+  onRemoveFile,
   onReorderFiles,
   compareLeftId = null,
   compareRightId = null,
@@ -33,12 +33,12 @@ export default function FileTabs({
     setDragOverIndex(index);
   };
 
-  const handleDrop = (e, dropIndex) => {
+  const handleDrop = (e, index) => {
     e.preventDefault();
     const dragIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
-    if (dragIndex === dropIndex) return;
+    if (dragIndex === index) return;
     if (onReorderFiles) {
-      onReorderFiles(dragIndex, dropIndex);
+      onReorderFiles(dragIndex, index);
     }
     setDraggedIndex(null);
     setDragOverIndex(null);
