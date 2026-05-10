@@ -14,7 +14,7 @@ test.describe('LogAnalyzer v1.3.1 GUI Tests', () => {
 
   test.beforeAll(async ({ playwright }) => {
     // 启动Electron应用
-    const electronPath = path.join(__dirname, '..', '..', 'dist', 'LogAnalyzer-1.3.1-portable.exe');
+    const electronPath = path.join(__dirname, '..', '..', 'dist', 'LogAnalyzer-1.3.2-portable.exe');
     console.log(`启动Electron应用: ${electronPath}`);
     
     // 使用playwright的electron启动方式
