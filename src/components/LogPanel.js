@@ -30,7 +30,7 @@ function getRowRegex(keyword, caseSensitive) {
   return _regexCache.get(key);
 }
 
-const LogPanel = forwardRef(function LogPanel({
+const LogPanel = React.memo(forwardRef(function LogPanel({
   lines,
   totalLines,
   highlightFilters,
@@ -40,6 +40,7 @@ const LogPanel = forwardRef(function LogPanel({
   onToggleBookmark,
   onAddAnnotation,
   onJumpToLine,
+  onAddFilterFromLine,
   searchTerm,
   filterMode,
   lineClassName, // 新增：行的自定义CSS类
@@ -140,8 +141,15 @@ const LogPanel = forwardRef(function LogPanel({
   const endIdx = Math.min(lines.length, Math.ceil((scrollTop + containerHeight) / LINE_HEIGHT) + BUFFER_LINES);
   const visibleLines = lines.slice(startIdx, endIdx);
 
+  // renderText 结果缓存 - 使用 WeakMap 避免重复计算
+  const renderTextCacheRef = useRef(new Map());
+  const prevRenderHelpersRef = useRef(null);
+
   // Pre-compute filter highlights as a lookup map for performance
   const renderHelpers = useMemo(() => {
+    // Invalidate cache when renderHelpers changes
+    renderTextCacheRef.current.clear();
+
     const hasFilters = highlightFilters && highlightFilters.length > 0;
     const hasSearch = searchTerm && searchTerm.length > 0;
 
@@ -177,6 +185,10 @@ const LogPanel = forwardRef(function LogPanel({
 
   // Highlight text - uses pre-compiled regexes from renderHelpers
   const renderText = useCallback((text) => {
+    // Check cache first
+    const cached = renderTextCacheRef.current.get(text);
+    if (cached !== undefined) return cached;
+
     const { hasFilters, hasSearch, filterDefs, searchTermLower } = renderHelpers;
     if (!hasFilters && !hasSearch) return text;
 
@@ -274,6 +286,7 @@ const LogPanel = forwardRef(function LogPanel({
     if (lastIndex < text.length) {
       result.push(text.substring(lastIndex));
     }
+    renderTextCacheRef.current.set(text, result);
     return result;
   }, [renderHelpers]);
 
@@ -294,6 +307,33 @@ const LogPanel = forwardRef(function LogPanel({
     }
     return null;
   }, [renderHelpers]);
+
+  // Pre-compute row highlights for visible lines (single pass)
+  const visibleRowHighlights = useMemo(() => {
+    const { rowHighlightDefs } = renderHelpers;
+    if (rowHighlightDefs.length === 0) return {};
+    const map = {};
+    for (const line of visibleLines) {
+      for (const def of rowHighlightDefs) {
+        if (def.type === 'regex') {
+          def.regex.lastIndex = 0;
+          if (def.regex.test(line.text)) {
+            map[line.num] = { backgroundColor: def.bgColor };
+            break;
+          }
+        } else {
+          const matched = def.caseSensitive
+            ? line.text.includes(def.keyword)
+            : line.text.toLowerCase().includes(def.keyword.toLowerCase());
+          if (matched) {
+            map[line.num] = { backgroundColor: def.bgColor };
+            break;
+          }
+        }
+      }
+    }
+    return map;
+  }, [visibleLines, renderHelpers]);
 
   // Context menu
   const handleContextMenu = (e, lineNum) => {
@@ -380,7 +420,7 @@ const LogPanel = forwardRef(function LogPanel({
                   top: actualIdx * LINE_HEIGHT,
                   left: 0,
                   height: LINE_HEIGHT,
-                  ...(getRowHighlight(line.text) || {}),
+                  ...(visibleRowHighlights[line.num] || {}),
                 }}
                 onContextMenu={(e) => handleContextMenu(e, line.num)}
               >
@@ -414,6 +454,15 @@ const LogPanel = forwardRef(function LogPanel({
           <div className="context-menu-item" onClick={() => startAnnotation(contextMenu.lineNum)}>
             {annotations.hasOwnProperty(contextMenu.lineNum) ? '编辑注释' : '添加注释'} <Icons.Note />
           </div>
+          {onAddFilterFromLine && (
+          <div className="context-menu-item" onClick={() => {
+            const line = lines.find(l => l.num === contextMenu.lineNum);
+            if (line) onAddFilterFromLine(line.text);
+            closeContextMenu();
+          }}>
+            <span style={{ color: 'var(--highlight-3)' }}>+</span> 添加为筛选条件
+          </div>
+          )}
           <div className="context-menu-item" onClick={() => { navigator.clipboard.writeText(lines.find(l => l.num === contextMenu.lineNum)?.text || ''); closeContextMenu(); }}>
             复制该行
           </div>
@@ -486,6 +535,14 @@ const LogPanel = forwardRef(function LogPanel({
       )}
     </div>
   );
+}), (prevProps, nextProps) => {
+  return prevProps.lines === nextProps.lines
+    && prevProps.highlightFilters === nextProps.highlightFilters
+    && prevProps.searchTerm === nextProps.searchTerm
+    && prevProps.filterMode === nextProps.filterMode
+    && prevProps.bookmarks === nextProps.bookmarks
+    && prevProps.annotations === nextProps.annotations
+    && prevProps.chartLinkedLine === nextProps.chartLinkedLine;
 });
 
 export default LogPanel;

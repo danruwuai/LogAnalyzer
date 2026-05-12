@@ -50,7 +50,7 @@ export default function StatusBar({
                 {onShowVisualization && (
           <button
             className="status-visualization-btn"
-            onClick={onShowVisualization}
+            onClick={(e) => { e.stopPropagation(); onShowVisualization(); }}
             title="显示详细收敛分析"
             style={{
               marginLeft: '8px',

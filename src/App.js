@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback, useRef, useEffect } from 'react';
+﻿import React, { useState, useCallback, useRef, useEffect, useDeferredValue } from 'react';
 import * as echarts from 'echarts';
 import Toolbar from './components/Toolbar';
 import LogPanel from './components/LogPanel';
@@ -71,6 +71,9 @@ export default function App() {
   const [filterItems, setFilterItems] = useState([]);
   const [filterMode, setFilterMode] = useState('filter');
   const [timeRange, setTimeRange] = useState({ start: '', end: '' });
+  // Deferred values for performance - UI stays responsive while computation is in progress
+  const deferredFilterItems = useDeferredValue(filterItems);
+  const deferredSearchTerm = useDeferredValue(searchTerm);
 
   // Bookmarks & annotations
   const [fileBookmarks, setFileBookmarks] = useState(new Set());
@@ -102,12 +105,10 @@ export default function App() {
   const [maximizedPanel, setMaximizedPanel] = useState(null);
   const handleMaximize = useCallback((panelId) => {
     setMaximizedPanel(panelId);
-    if (panelId === 'log') setPanelMode('log-full');
   }, []);
   const handleRestore = useCallback(() => {
     setMaximizedPanel(null);
-    if (panelMode !== 'split') setPanelMode('split');
-  }, [panelMode]);
+  }, []);
 
   // Fullscreen handler for bottom panel tabs
   const handlePanelFullscreen = useCallback((mode) => {
@@ -373,7 +374,7 @@ export default function App() {
 
   // Extractor helpers
   const addExtractor = useCallback(() => {
-    setExtractors(prev => [...prev, { name: `Metric${prev.length + 1}`, regex: '', color: COLORS[prev.length % COLORS.length] }]);
+    setExtractors(prev => [...prev, { name: `Metric${prev.length + 1}`, regex: '(\\d+)', color: COLORS[prev.length % COLORS.length] }]);
   }, []);
   const updateExtractor = useCallback((i, field, val) => {
     setExtractors(prev => prev.map((e, idx) => idx === i ? { ...e, [field]: val } : e));
@@ -393,37 +394,71 @@ export default function App() {
     setThresholds(prev => prev.filter((_, idx) => idx !== i));
   }, []);
 
+  // Add filter from line text (context menu)
+  const handleAddFilterFromLine = useCallback((text) => {
+    // Extract first meaningful keyword (up to 40 chars, no whitespace)
+    const keyword = text.trim().split(/\s+/)[0]?.substring(0, 40) || text.trim().substring(0, 40);
+    if (!keyword) return;
+    const colorIdx = filterItems.length % 7;
+    const colors = [
+      { bg: 'rgba(137, 180, 250, 0.2)', fg: '#89b4fa' },
+      { bg: 'rgba(166, 227, 161, 0.2)', fg: '#a6e3a1' },
+      { bg: 'rgba(249, 226, 175, 0.2)', fg: '#f9e2af' },
+      { bg: 'rgba(243, 139, 168, 0.2)', fg: '#f38ba8' },
+      { bg: 'rgba(250, 179, 135, 0.2)', fg: '#fab387' },
+      { bg: 'rgba(203, 166, 247, 0.2)', fg: '#cba6f7' },
+      { bg: 'rgba(148, 226, 213, 0.2)', fg: '#94e2d5' },
+    ];
+    const color = colors[colorIdx];
+    setFilterItems(prev => [...prev, {
+      id: Date.now(), enabled: true, keyword,
+      caseSensitive: false, isRegex: false, exclude: false,
+      highlightRow: false, bgColor: color.bg, fgColor: color.fg, fontColor: '',
+    }]);
+    setBottomPanel('filter');
+    setShowBottomPanel(true);
+  }, [filterItems]);
+
   // Filtered lines
   const filteredLines = React.useMemo(() => {
     let result = lines;
     if (filterMode === 'show-all') return result;
-    const activeFilters = filterItems.filter(item => item.enabled && item.keyword);
+    const activeFilters = deferredFilterItems.filter(item => item.enabled && item.keyword);
     if (activeFilters.length > 0) {
-      const includeFilters = activeFilters.filter(f => !f.exclude);
-      const excludeFilters = activeFilters.filter(f => f.exclude);
+      // Pre-compile regexes once, outside the loop
+      const precompiled = activeFilters.map(filter => {
+        if (filter.isRegex) {
+          try { return { ...filter, _regex: new RegExp(filter.keyword, filter.caseSensitive ? '' : 'i') }; }
+          catch { return null; }
+        }
+        const kw = filter.caseSensitive ? filter.keyword : filter.keyword.toLowerCase();
+        return { ...filter, _keyword: kw };
+      }).filter(Boolean);
+      const includeFilters = precompiled.filter(f => !f.exclude);
+      const excludeFilters = precompiled.filter(f => f.exclude);
       if (includeFilters.length > 0) {
         result = result.filter(line => includeFilters.some(filter => {
           try {
-            if (filter.isRegex) return new RegExp(filter.keyword, filter.caseSensitive ? '' : 'i').test(line.text);
-            return filter.caseSensitive ? line.text.includes(filter.keyword) : line.text.toLowerCase().includes(filter.keyword.toLowerCase());
+            if (filter._regex) return filter._regex.test(line.text);
+            return filter.caseSensitive ? line.text.includes(filter._keyword) : line.text.toLowerCase().includes(filter._keyword);
           } catch { return false; }
         }));
       }
       if (excludeFilters.length > 0) {
         result = result.filter(line => !excludeFilters.some(filter => {
           try {
-            if (filter.isRegex) return new RegExp(filter.keyword, filter.caseSensitive ? '' : 'i').test(line.text);
-            return filter.caseSensitive ? line.text.includes(filter.keyword) : line.text.toLowerCase().includes(filter.keyword.toLowerCase());
+            if (filter._regex) return filter._regex.test(line.text);
+            return filter.caseSensitive ? line.text.includes(filter._keyword) : line.text.toLowerCase().includes(filter._keyword);
           } catch { return false; }
         }));
       }
     }
     return result;
-  }, [lines, filterItems, filterMode]);
+  }, [lines, deferredFilterItems, filterMode]);
 
   const activeHighlightFilters = React.useMemo(
-    () => filterItems.filter(item => item.enabled && item.keyword && !item.exclude),
-    [filterItems]
+    () => deferredFilterItems.filter(item => item.enabled && item.keyword && !item.exclude),
+    [deferredFilterItems]
   );
 
   const jumpToLine = useCallback((lineNum) => {
@@ -440,8 +475,8 @@ export default function App() {
 
   // Search match count (memoized for performance, cap at 50k lines)
   const searchMatchCount = React.useMemo(() => {
-    if (!searchTerm) return 0;
-    const term = searchTerm.toLowerCase();
+    if (!deferredSearchTerm) return 0;
+    const term = deferredSearchTerm.toLowerCase();
     const scanLines = filteredLines.length > 50000 ? filteredLines.slice(0, 50000) : filteredLines;
     let count = 0;
     for (let i = 0; i < scanLines.length; i++) {
@@ -556,20 +591,23 @@ export default function App() {
           if (firstVisible != null) toggleBookmark(firstVisible);
         }
       }
-      // Ctrl+Shift+L - log fullscreen toggle (sync with maximizedPanel)
+      // Ctrl+Shift+L - log fullscreen toggle
       if (e.ctrlKey && e.shiftKey && e.key === 'L') {
         e.preventDefault();
         setMaximizedPanel(prev => prev === 'log' ? null : 'log');
-        setPanelMode(prev => prev === 'log-full' ? 'split' : 'log-full');
       }
       // Escape - exit any fullscreen mode
-      if (e.key === 'Escape' && panelMode !== 'split') {
-        setPanelMode('split');
+      if (e.key === 'Escape') {
+        if (maximizedPanel) {
+          setMaximizedPanel(null);
+        } else if (panelMode !== 'split') {
+          setPanelMode('split');
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleOpenFile, toggleBookmark, panelMode]);
+  }, [handleOpenFile, toggleBookmark, panelMode, maximizedPanel]);
 
   // Auto-load for demo & menu events
   useEffect(() => {
@@ -877,6 +915,7 @@ export default function App() {
         files={files}
         activeFileId={activeFileId}
         onSetActiveFile={handleSetActiveFile}
+        onRemoveFile={handleRemoveFile}
         compareMode={compareMode}
         onToggleCompareMode={() => setCompareMode(prev => !prev)}
       />
@@ -966,9 +1005,8 @@ export default function App() {
       ) : (
         <ErrorBoundary>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-          {/* Log panel - always rendered except in log-full mode (rendered by DraggablePanel in fullscreen) */}
-          {panelMode !== 'log-full' && (
-            <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
+          {/* Log panel - always rendered (DraggablePanel handles maximized state) */}
+          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
               {compareMode ? (
                 <CompareView 
                   files={files}
@@ -993,7 +1031,7 @@ export default function App() {
                   actions={
                     <button
                       className="panel-title-btn panel-fullscreen-btn"
-                      onClick={() => handlePanelFullscreen('log-full')}
+                      onClick={() => handleMaximize('log')}
                       title="全屏 (Ctrl+Shift+L)"
                       style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 14, padding: '2px 6px', borderRadius: 3, display: 'flex', alignItems: 'center' }}
                     >
@@ -1012,16 +1050,16 @@ export default function App() {
                     onToggleBookmark={toggleBookmark}
                     onAddAnnotation={addAnnotation}
                     onJumpToLine={jumpToLine}
-                    searchTerm={searchTerm}
+                    onAddFilterFromLine={handleAddFilterFromLine}
+                    searchTerm={deferredSearchTerm}
                     filterMode={filterMode}
                   />
                 </DraggablePanel>
               )}
             </div>
-          )}
 
           {/* Timeline Overview - 日志密度缩略图 */}
-          {panelMode !== 'log-full' && lines.length > 0 && (
+          {lines.length > 0 && (
             <TimelineOverview
               lines={lines}
               totalLines={totalLines}
@@ -1043,10 +1081,10 @@ export default function App() {
                     className={`bottom-panel-tab ${bottomPanel === tab ? 'active' : ''}`}
                     onClick={() => { setBottomPanel(tab); setShowBottomPanel(true); }}
                   >
-                    {tab === 'filter' && <><Icons.Filter /> 筛选 ({filterItems.length})</>}
-                    {tab === 'chart' && <><Icons.Chart /> 图表 ({extractors.length})</>}
-                    {tab === 'annotations' && <><Icons.NoteList /> 注释 ({Object.keys(annotations).length})</>}
-                    {tab === 'config' && <><Icons.Gear /> 配置</>}
+                    {tab === 'filter' && <><Icons.Filter /> 筛选 <kbd style={{fontSize:9, opacity:0.5}}>Ctrl+1</kbd> ({filterItems.length})</>}
+                    {tab === 'chart' && <><Icons.Chart /> 图表 <kbd style={{fontSize:9, opacity:0.5}}>Ctrl+2</kbd> ({extractors.length})</>}
+                    {tab === 'annotations' && <><Icons.NoteList /> 注释 <kbd style={{fontSize:9, opacity:0.5}}>Ctrl+3</kbd> ({Object.keys(annotations).length})</>}
+                    {tab === 'config' && <><Icons.Gear /> 配置 <kbd style={{fontSize:9, opacity:0.5}}>Ctrl+4</kbd></>}
                   </button>
                 ))}
                 {/* Separator */}
@@ -1135,6 +1173,7 @@ export default function App() {
                   xAxisField={xAxisField} onXAxisFieldChange={setXAxisField}
                   thresholds={thresholds} onAddThreshold={addThreshold} onUpdateThreshold={updateThreshold} onRemoveThreshold={removeThreshold}
                   annotations={annotations} onJumpToLine={jumpToLine} chartLinkedLine={chartLinkedLine}
+                  fullscreen={true}
                 />
               </div>
               {/* Mini tab bar for switching tabs */}
@@ -1276,11 +1315,39 @@ export default function App() {
 // --- Inline panels (compact, bottom bar style) ---
 
 function FilterPanelInline({ filterItems, onFilterItemsChange, filterMode, onFilterModeChange }) {
+  const [quickAddValue, setQuickAddValue] = useState('');
+
+  const filterColors = [
+    { bg: 'rgba(137, 180, 250, 0.2)', fg: '#89b4fa' },
+    { bg: 'rgba(166, 227, 161, 0.2)', fg: '#a6e3a1' },
+    { bg: 'rgba(249, 226, 175, 0.2)', fg: '#f9e2af' },
+    { bg: 'rgba(243, 139, 168, 0.2)', fg: '#f38ba8' },
+    { bg: 'rgba(250, 179, 135, 0.2)', fg: '#fab387' },
+    { bg: 'rgba(203, 166, 247, 0.2)', fg: '#cba6f7' },
+    { bg: 'rgba(148, 226, 213, 0.2)', fg: '#94e2d5' },
+  ];
+
+  const handleQuickAdd = () => {
+    const keyword = quickAddValue.trim();
+    if (!keyword) return;
+    const colorIdx = filterItems.length % 7;
+    const color = filterColors[colorIdx];
+    onFilterItemsChange([...filterItems, {
+      id: Date.now(), enabled: true, keyword,
+      caseSensitive: false, isRegex: false, exclude: false,
+      highlightRow: false, bgColor: color.bg, fgColor: color.fg, fontColor: '',
+    }]);
+    setQuickAddValue('');
+  };
+
   const toggleItem = (id) => {
     onFilterItemsChange(filterItems.map(item => item.id === id ? { ...item, enabled: !item.enabled } : item));
   };
   const removeItem = (id) => {
     onFilterItemsChange(filterItems.filter(item => item.id !== id));
+  };
+  const toggleCaseSensitive = (id) => {
+    onFilterItemsChange(filterItems.map(item => item.id === id ? { ...item, caseSensitive: !item.caseSensitive } : item));
   };
   const toggleExclude = (id) => {
     onFilterItemsChange(filterItems.map(item => item.id === id ? { ...item, exclude: !item.exclude } : item));
@@ -1288,6 +1355,19 @@ function FilterPanelInline({ filterItems, onFilterItemsChange, filterMode, onFil
   const toggleHighlight = (id) => {
     onFilterItemsChange(filterItems.map(item => item.id === id ? { ...item, highlightRow: !item.highlightRow } : item));
   };
+  const updateColor = (id, field, value) => {
+    onFilterItemsChange(filterItems.map(item => item.id === id ? { ...item, [field]: value } : item));
+  };
+
+  const colorPresets = [
+    { fg: '#f38ba8', bg: 'rgba(243, 139, 168, 0.15)', label: '红' },
+    { fg: '#f9e2af', bg: 'rgba(249, 226, 175, 0.15)', label: '黄' },
+    { fg: '#a6e3a1', bg: 'rgba(166, 227, 161, 0.15)', label: '绿' },
+    { fg: '#89b4fa', bg: 'rgba(137, 180, 250, 0.15)', label: '蓝' },
+    { fg: '#cba6f7', bg: 'rgba(203, 166, 247, 0.15)', label: '紫' },
+    { fg: '#fab387', bg: 'rgba(250, 179, 135, 0.15)', label: '橙' },
+    { fg: '#94e2d5', bg: 'rgba(148, 226, 213, 0.15)', label: '青' },
+  ];
 
   return (
     <div className="filter-inline">
@@ -1296,22 +1376,60 @@ function FilterPanelInline({ filterItems, onFilterItemsChange, filterMode, onFil
         <button className={`toolbar-btn small ${filterMode === 'show-all' ? 'active' : ''}`} onClick={() => onFilterModeChange('show-all')}>全显模式</button>
         <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>匹配: {filterItems.filter(i => i.enabled).length} 条件</span>
       </div>
-      <div className="filter-inline-list">
+      {/* 快速添加筛选条件 */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+        <input
+          className="toolbar-input"
+          style={{ flex: 1, fontSize: 12, padding: '4px 8px', background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-primary)', borderRadius: 4 }}
+          placeholder="输入关键字后按回车添加筛选条件..."
+          value={quickAddValue}
+          onChange={e => setQuickAddValue(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') handleQuickAdd(); }}
+        />
+        <button className="toolbar-btn small" onClick={handleQuickAdd} title="添加筛选条件">+ 添加</button>
+      </div>
+      <div className="filter-inline-list" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {filterItems.map(item => (
-          <div key={item.id} className="filter-inline-item" style={{ borderLeft: `3px solid ${item.fgColor}` }}>
-            <input type="checkbox" checked={item.enabled} onChange={() => toggleItem(item.id)} />
-            <span className="filter-inline-keyword" style={{ color: item.fgColor }}>{item.keyword}</span>
-            {item.isRegex && <span className="filter-inline-badge">.*</span>}
-            <button className={`filter-inline-btn ${item.exclude ? 'active-exclude' : ''}`} onClick={() => toggleExclude(item.id)} title="排除">
-              {item.exclude ? '⊘' : '✓'}
+          <div key={item.id} style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '4px 8px', background: 'var(--bg-panel)', borderRadius: 4,
+            borderLeft: `3px solid ${item.fgColor}`,
+            fontSize: 12,
+          }}>
+            <input type="checkbox" checked={item.enabled} onChange={() => toggleItem(item.id)} title="启用/禁用" />
+            <span className="filter-inline-keyword" style={{ color: item.fgColor, fontWeight: 600, minWidth: 80 }}>{item.keyword}</span>
+            {item.isRegex && <span className="filter-inline-badge" style={{ fontSize: 10, color: 'var(--text-muted)' }}>.*</span>}
+            {/* 大小写切换 */}
+            <button className={`filter-inline-btn ${item.caseSensitive ? 'active-hl' : ''}`}
+              onClick={() => toggleCaseSensitive(item.id)}
+              title={item.caseSensitive ? '大小写敏感 (当前: 开)' : '大小写敏感 (当前: 关)'}
+              style={{ fontSize: 10, padding: '2px 4px' }}>
+              Aa
             </button>
-            <button className={`filter-inline-btn ${item.highlightRow ? 'active-hl' : ''}`} onClick={() => toggleHighlight(item.id)} title="整行高亮">
-              {item.highlightRow ? '█' : '░'}
+            {/* 排除/包含 */}
+            <button className={`filter-inline-btn ${item.exclude ? 'active-exclude' : ''}`}
+              onClick={() => toggleExclude(item.id)}
+              title={item.exclude ? '排除模式' : '包含模式'}>
+              {item.exclude ? '排除' : '包含'}
             </button>
-            <button className="filter-inline-btn" onClick={() => removeItem(item.id)} title="删除">×</button>
+            {/* 整行高亮 */}
+            <button className={`filter-inline-btn ${item.highlightRow ? 'active-hl' : ''}`}
+              onClick={() => toggleHighlight(item.id)}
+              title={item.highlightRow ? '整行高亮' : '仅关键字高亮'}>
+              {item.highlightRow ? '█行' : '░字'}
+            </button>
+            {/* 颜色选择 - 显示当前色块 + 颜色选择器 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>色:</span>
+              <input type="color" value={item.fgColor} onChange={e => updateColor(item.id, 'fgColor', e.target.value)}
+                style={{ width: 20, height: 20, border: 'none', cursor: 'pointer', padding: 0, background: 'transparent' }} title="前景色" />
+            </div>
+            {/* 删除 */}
+            <button className="filter-inline-btn" onClick={() => removeItem(item.id)} title="删除此条件"
+              style={{ marginLeft: 'auto', color: '#f38ba8' }}>×</button>
           </div>
         ))}
-        {filterItems.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: '8px 0' }}>在搜索框输入关键字后按回车添加过滤</div>}
+        {filterItems.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: '8px 0' }}>在上方输入关键字后按回车或点击"添加"按钮添加筛选条件</div>}
       </div>
     </div>
   );
@@ -1320,11 +1438,38 @@ function FilterPanelInline({ filterItems, onFilterItemsChange, filterMode, onFil
 function ChartPanelInline({ lines, extractors, chartData: chartDataProp, onAddExtractor, onUpdateExtractor, onRemoveExtractor,
   xAxisMode, onXAxisModeChange, xAxisField, onXAxisFieldChange,
   thresholds, onAddThreshold, onUpdateThreshold, onRemoveThreshold,
-  annotations, onJumpToLine, chartLinkedLine }) {
+  annotations, onJumpToLine, chartLinkedLine, fullscreen }) {
 
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
-  // Use prop chartData if provided (computed at App level), otherwise fall back to inline computation
+
+  // Frequency mode state
+  const [chartMode, setChartMode] = useState('extract');
+  const [freqKeyword, setFreqKeyword] = useState('');
+  const [freqWindowSize, setFreqWindowSize] = useState(100);
+
+  // Compute frequency data
+  const freqData = React.useMemo(() => {
+    if (!freqKeyword.trim() || lines.length === 0) return null;
+    const kw = freqKeyword.trim().toLowerCase();
+    const windowSize = freqWindowSize;
+    const numWindows = Math.ceil(lines.length / windowSize);
+    const counts = new Array(numWindows).fill(0);
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].text.toLowerCase().includes(kw)) {
+        const winIdx = Math.floor(i / windowSize);
+        counts[winIdx]++;
+      }
+    }
+    return counts.map((count, i) => ({
+      windowIndex: i,
+      windowStart: i * windowSize,
+      windowEnd: Math.min((i + 1) * windowSize - 1, lines.length - 1),
+      count,
+    }));
+  }, [lines, freqKeyword, freqWindowSize]);
+
+  // Use prop chartData if provided, otherwise fall back to inline computation
   const chartData = chartDataProp !== undefined ? chartDataProp : React.useMemo(() => {
     if (extractors.length === 0 || lines.length === 0) return null;
     const regexes = extractors.map(e => {
@@ -1360,53 +1505,65 @@ function ChartPanelInline({ lines, extractors, chartData: chartDataProp, onAddEx
     if (!chartInstance.current) {
       chartInstance.current = echarts.init(chartRef.current, logAnalyzerTheme, { renderer: 'canvas' });
     }
-    if (!chartData || chartData.length === 0) { chartInstance.current.clear(); return; }
 
-    const metricNames = extractors.map(e => e.name).filter(n => n !== 'seqNum' && n !== 'isConverge');
-    const xData = xAxisMode === 'data' ? chartData.map(d => d[xAxisField] ?? d.lineNum) : chartData.map(d => d.lineNum);
-    const series = metricNames.map(name => {
-      const s = {
-        name, type: 'line', data: chartData.map(d => d[name] ?? null),
-        smooth: true, symbol: 'circle', symbolSize: 3,
-        lineStyle: { width: 2 }, itemStyle: { color: extractors.find(e => e.name === name)?.color || '#89b4fa' },
-      };
-      // Add threshold markLines for matching metrics
-      const matchingThresholds = thresholds.filter(t => !t.metric || t.metric === name);
-      if (matchingThresholds.length > 0) {
-        s.markLine = {
-          silent: true, symbol: 'none',
-          data: matchingThresholds.map(t => ({
-            yAxis: t.value, name: t.name,
-            lineStyle: { color: t.color, type: 'dashed', width: 1 },
-            label: { formatter: t.name, color: t.color, fontSize: 10 },
-          })),
+    if (chartMode === 'frequency') {
+      // Render frequency chart
+      if (!freqData || freqData.length === 0) { chartInstance.current.clear(); return; }
+      const xData = freqData.map(d => `${d.windowStart}-${d.windowEnd}`);
+      chartInstance.current.setOption({
+        backgroundColor: 'transparent',
+        title: { text: `"${freqKeyword}" 出现频率 (每${freqWindowSize}行)`, textStyle: { color: '#8a8f98', fontSize: 12 }, left: 'center', top: 0 },
+        grid: { left: 50, right: 20, top: 30, bottom: 25 },
+        xAxis: { type: 'category', data: xData, axisLabel: { color: '#8a8f98', fontSize: 9, rotate: 45 } },
+        yAxis: { type: 'value', name: '出现次数', nameTextStyle: { color: '#8a8f98', fontSize: 10 }, axisLabel: { color: '#8a8f98', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } } },
+        dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 0, height: 16 }],
+        series: [{
+          name: '频率', type: 'line', data: freqData.map(d => d.count),
+          smooth: true, symbol: 'circle', symbolSize: 3,
+          lineStyle: { width: 2, color: '#cba6f7' },
+          itemStyle: { color: '#cba6f7' },
+          areaStyle: { color: 'rgba(203, 166, 247, 0.15)' },
+        }],
+      }, true);
+    } else {
+      // Render extract-based chart
+      if (!chartData || chartData.length === 0) { chartInstance.current.clear(); return; }
+      const metricNames = extractors.map(e => e.name).filter(n => n !== 'seqNum' && n !== 'isConverge');
+      const xData = xAxisMode === 'data' ? chartData.map(d => d[xAxisField] ?? d.lineNum) : chartData.map(d => d.lineNum);
+      const series = metricNames.map(name => {
+        const s = {
+          name, type: 'line', data: chartData.map(d => d[name] ?? null),
+          smooth: true, symbol: 'circle', symbolSize: 3,
+          lineStyle: { width: 2 }, itemStyle: { color: extractors.find(e => e.name === name)?.color || '#89b4fa' },
         };
-      }
-      return s;
-    });
-
-    chartInstance.current.setOption({
-      /* 背景透明，使用 CSS 背景穿透 */
-      backgroundColor: 'transparent',
-      /* 图例 */
-      legend: { data: metricNames, top: 0, textStyle: { color: '#8a8f98', fontSize: 11 } },
-      /* 网格 */
-      grid: { left: 50, right: 20, top: 30, bottom: 25 },
-      /* X轴 */
-      xAxis: { type: 'category', data: xData, axisLabel: { color: '#8a8f98', fontSize: 10 } },
-      /* Y轴 */
-      yAxis: { type: 'value', axisLabel: { color: '#8a8f98', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } } },
-      /* 缩放 */
-      dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 0, height: 16 }],
-      series,
-    }, true);
+        const matchingThresholds = thresholds.filter(t => !t.metric || t.metric === name);
+        if (matchingThresholds.length > 0) {
+          s.markLine = {
+            silent: true, symbol: 'none',
+            data: matchingThresholds.map(t => ({
+              yAxis: t.value, name: t.name,
+              lineStyle: { color: t.color, type: 'dashed', width: 1 },
+              label: { formatter: t.name, color: t.color, fontSize: 10 },
+            })),
+          };
+        }
+        return s;
+      });
+      chartInstance.current.setOption({
+        backgroundColor: 'transparent',
+        legend: { data: metricNames, top: 0, textStyle: { color: '#8a8f98', fontSize: 11 } },
+        grid: { left: 50, right: 20, top: 30, bottom: 25 },
+        xAxis: { type: 'category', data: xData, axisLabel: { color: '#8a8f98', fontSize: 10 } },
+        yAxis: { type: 'value', axisLabel: { color: '#8a8f98', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } } },
+        dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 0, height: 16 }],
+        series,
+      }, true);
+    }
 
     const handleResize = () => chartInstance.current?.resize();
     window.addEventListener('resize', handleResize);
-    return () => {
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [chartData, extractors, xAxisMode, xAxisField, thresholds]);
+    return () => { window.removeEventListener('resize', handleResize); };
+  }, [chartMode, chartData, extractors, xAxisMode, xAxisField, thresholds, freqData, freqKeyword, freqWindowSize]);
 
   // Cleanup chart instance on unmount
   useEffect(() => {
@@ -1421,13 +1578,28 @@ function ChartPanelInline({ lines, extractors, chartData: chartDataProp, onAddEx
   return (
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-        <select value={xAxisMode} onChange={e => onXAxisModeChange(e.target.value)} style={{ fontSize: 12 }}>
-          <option value="line">X轴: 行号</option><option value="data">X轴: 数据字段</option>
-        </select>
-        {xAxisMode === 'data' && <input className="toolbar-input" style={{ width: 100 }} placeholder="字段名" value={xAxisField} onChange={e => onXAxisFieldChange(e.target.value)} />}
-        <button className="toolbar-btn small" onClick={onAddExtractor}>+ 指标</button>
-        <button className="toolbar-btn small" onClick={onAddThreshold}>+ 阈值线</button>
-        {chartData && chartData.length > 0 && (
+        <button className={`toolbar-btn small ${chartMode === 'extract' ? 'active' : ''}`} onClick={() => setChartMode('extract')}>数值提取</button>
+        <button className={`toolbar-btn small ${chartMode === 'frequency' ? 'active' : ''}`} onClick={() => setChartMode('frequency')}>频率统计</button>
+        {chartMode === 'frequency' ? (
+          <>
+            <input className="toolbar-input" style={{ width: 120, fontSize: 12 }} placeholder="输入关键字..."
+              value={freqKeyword} onChange={e => setFreqKeyword(e.target.value)} />
+            <select value={freqWindowSize} onChange={e => setFreqWindowSize(Number(e.target.value))} style={{ fontSize: 12 }}>
+              <option value={50}>每50行</option><option value={100}>每100行</option>
+              <option value={200}>每200行</option><option value={500}>每500行</option>
+            </select>
+          </>
+        ) : (
+          <>
+            <select value={xAxisMode} onChange={e => onXAxisModeChange(e.target.value)} style={{ fontSize: 12 }}>
+              <option value="line">X轴: 行号</option><option value="data">X轴: 数据字段</option>
+            </select>
+            {xAxisMode === 'data' && <input className="toolbar-input" style={{ width: 100 }} placeholder="字段名" value={xAxisField} onChange={e => onXAxisFieldChange(e.target.value)} />}
+            <button className="toolbar-btn small" onClick={onAddExtractor}>+ 指标</button>
+            <button className="toolbar-btn small" onClick={onAddThreshold}>+ 阈值线</button>
+          </>
+        )}
+        {chartMode === 'extract' && chartData && chartData.length > 0 && (
           <>
             <button className="toolbar-btn small" onClick={() => {
               if (!chartInstance.current) return;
@@ -1449,9 +1621,30 @@ function ChartPanelInline({ lines, extractors, chartData: chartDataProp, onAddEx
             }}>导出CSV</button>
           </>
         )}
+        {chartMode === 'frequency' && freqData && freqData.length > 0 && (
+          <button className="toolbar-btn small" onClick={() => {
+            if (!chartInstance.current) return;
+            const url = chartInstance.current.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#0a0a0b' });
+            const a = document.createElement('a');
+            a.href = url; a.download = 'frequency_chart.png'; a.click();
+          }}>保存图表</button>
+        )}
       </div>
-      {/* Stats summary */}
-      {chartData && chartData.length > 0 && (
+
+      {/* Frequency mode: stats summary */}
+      {chartMode === 'frequency' && freqData && freqData.length > 0 && (
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 4, fontSize: 11 }}>
+          <div style={{ background: 'var(--bg-panel)', padding: '2px 8px', borderRadius: 4, borderLeft: '3px solid #cba6f7' }}>
+            <span style={{ color: '#cba6f7', fontWeight: 600 }}>"{freqKeyword}"</span>
+            <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>总计:{freqData.reduce((s, d) => s + d.count, 0)}次</span>
+            <span style={{ color: 'var(--text-muted)' }}> 窗口:{freqData.length}个</span>
+            <span style={{ color: 'var(--text-muted)' }}> 峰值:{Math.max(...freqData.map(d => d.count))}次/窗口</span>
+          </div>
+        </div>
+      )}
+
+      {/* Extract mode: stats summary */}
+      {chartMode === 'extract' && chartData && chartData.length > 0 && (
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 4, fontSize: 11 }}>
           {extractors.filter(e => e.name !== 'seqNum' && e.name !== 'isConverge').map(ext => {
             const vals = chartData.map(d => d[ext.name]).filter(v => v != null && !isNaN(v));
@@ -1471,19 +1664,55 @@ function ChartPanelInline({ lines, extractors, chartData: chartDataProp, onAddEx
           })}
         </div>
       )}
-      <div ref={chartRef} style={{ width: '100%', height: 200, minHeight: 200, position: 'relative' }} />
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-        {extractors.map((ext, i) => (
-          <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, background: 'var(--bg-panel)', padding: '2px 6px', borderRadius: 4, borderLeft: `3px solid ${ext.color}` }}>
-            <input style={{ width: 70, fontSize: 11, background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-primary)', borderRadius: 3, padding: '1px 4px' }}
-              value={ext.name} onChange={e => onUpdateExtractor(i, 'name', e.target.value)} placeholder="名称" />
-            <input style={{ width: 100, fontSize: 11, background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-primary)', borderRadius: 3, padding: '1px 4px' }}
-              value={ext.regex} onChange={e => onUpdateExtractor(i, 'regex', e.target.value)} placeholder="正则 (分组1)" />
-            <input type="color" value={ext.color} onChange={e => onUpdateExtractor(i, 'color', e.target.value)} style={{ width: 20, height: 20, border: 'none', cursor: 'pointer' }} />
-            <button style={{ background: 'none', border: 'none', color: '#f38ba8', cursor: 'pointer', fontSize: 14 }} onClick={() => onRemoveExtractor(i)}>×</button>
-          </div>
-        ))}
-      </div>
+
+      {/* Empty data hint */}
+      {chartMode === 'extract' && extractors.length > 0 && (!chartData || chartData.length === 0) && (
+        <div style={{ color: 'var(--text-muted)', fontSize: 11, padding: '8px 0', textAlign: 'center' }}>
+          {extractors.some(e => !e.regex || e.regex === '')
+            ? '请为正则提取器输入有效的正则表达式（需包含捕获组，如 (\\d+)）'
+            : '正则未匹配到有效数值，请确保正则包含捕获组且匹配数字'}
+        </div>
+      )}
+      {chartMode === 'frequency' && (!freqKeyword.trim()) && (
+        <div style={{ color: 'var(--text-muted)', fontSize: 11, padding: '8px 0', textAlign: 'center' }}>
+          输入关键字后查看其在日志中的出现频率分布
+        </div>
+      )}
+      {chartMode === 'frequency' && freqKeyword.trim() && freqData && freqData.length > 0 && freqData.every(d => d.count === 0) && (
+        <div style={{ color: 'var(--text-muted)', fontSize: 11, padding: '8px 0', textAlign: 'center' }}>
+          未找到包含 "{freqKeyword}" 的日志行
+        </div>
+      )}
+
+      <div ref={chartRef} style={{ width: '100%', height: fullscreen ? 'calc(100vh - 250px)' : 200, minHeight: fullscreen ? 400 : 200, position: 'relative' }} />
+
+      {/* Extractors list (extract mode only) */}
+      {chartMode === 'extract' && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+          {extractors.map((ext, i) => {
+            let matchCount = 0;
+            if (ext.regex && chartDataProp) {
+              try {
+                const re = new RegExp(ext.regex);
+                for (const line of lines) {
+                  if (re.test(line.text)) matchCount++;
+                }
+              } catch {}
+            }
+            return (
+            <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, background: 'var(--bg-panel)', padding: '2px 6px', borderRadius: 4, borderLeft: `3px solid ${ext.color}` }}>
+              <input style={{ width: 70, fontSize: 11, background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-primary)', borderRadius: 3, padding: '1px 4px' }}
+                value={ext.name} onChange={e => onUpdateExtractor(i, 'name', e.target.value)} placeholder="名称" />
+              <input style={{ width: 100, fontSize: 11, background: 'var(--bg-surface)', border: '1px solid var(--border-default)', color: 'var(--text-primary)', borderRadius: 3, padding: '1px 4px' }}
+                value={ext.regex} onChange={e => onUpdateExtractor(i, 'regex', e.target.value)} placeholder="正则 (分组1)" />
+              {ext.regex && <span style={{ color: matchCount > 0 ? 'var(--highlight-3)' : 'var(--text-muted)', fontSize: 10 }}>{matchCount}行</span>}
+              <input type="color" value={ext.color} onChange={e => onUpdateExtractor(i, 'color', e.target.value)} style={{ width: 20, height: 20, border: 'none', cursor: 'pointer' }} />
+              <button style={{ background: 'none', border: 'none', color: '#f38ba8', cursor: 'pointer', fontSize: 14 }} onClick={() => onRemoveExtractor(i)}>×</button>
+            </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
