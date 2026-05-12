@@ -1134,6 +1134,7 @@ export default function App() {
                       xAxisField={xAxisField} onXAxisFieldChange={setXAxisField}
                       thresholds={thresholds} onAddThreshold={addThreshold} onUpdateThreshold={updateThreshold} onRemoveThreshold={removeThreshold}
                       annotations={annotations} onJumpToLine={jumpToLine} chartLinkedLine={chartLinkedLine}
+                      filterItems={filterItems}
                     />}
                     {bottomPanel === 'annotations' && <AnnotationsPanelInline
                       annotations={annotations} onRemoveAnnotation={removeAnnotation} onJumpToLine={jumpToLine}
@@ -1173,6 +1174,7 @@ export default function App() {
                   xAxisField={xAxisField} onXAxisFieldChange={setXAxisField}
                   thresholds={thresholds} onAddThreshold={addThreshold} onUpdateThreshold={updateThreshold} onRemoveThreshold={removeThreshold}
                   annotations={annotations} onJumpToLine={jumpToLine} chartLinkedLine={chartLinkedLine}
+                  filterItems={filterItems}
                   fullscreen={true}
                 />
               </div>
@@ -1316,6 +1318,7 @@ export default function App() {
 
 function FilterPanelInline({ filterItems, onFilterItemsChange, filterMode, onFilterModeChange }) {
   const [quickAddValue, setQuickAddValue] = useState('');
+  const [hoveredId, setHoveredId] = useState(null);
 
   const filterColors = [
     { bg: 'rgba(137, 180, 250, 0.2)', fg: '#89b4fa' },
@@ -1326,6 +1329,13 @@ function FilterPanelInline({ filterItems, onFilterItemsChange, filterMode, onFil
     { bg: 'rgba(203, 166, 247, 0.2)', fg: '#cba6f7' },
     { bg: 'rgba(148, 226, 213, 0.2)', fg: '#94e2d5' },
   ];
+
+  // Ensure items have all fields (defensive against old profiles/imports)
+  const safeItems = filterItems.map(item => ({
+    caseSensitive: false, isRegex: false, exclude: false,
+    highlightRow: false, bgColor: '', fgColor: '#89b4fa', fontColor: '',
+    ...item,
+  }));
 
   const handleQuickAdd = () => {
     const keyword = quickAddValue.trim();
@@ -1358,16 +1368,9 @@ function FilterPanelInline({ filterItems, onFilterItemsChange, filterMode, onFil
   const updateColor = (id, field, value) => {
     onFilterItemsChange(filterItems.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
-
-  const colorPresets = [
-    { fg: '#f38ba8', bg: 'rgba(243, 139, 168, 0.15)', label: '红' },
-    { fg: '#f9e2af', bg: 'rgba(249, 226, 175, 0.15)', label: '黄' },
-    { fg: '#a6e3a1', bg: 'rgba(166, 227, 161, 0.15)', label: '绿' },
-    { fg: '#89b4fa', bg: 'rgba(137, 180, 250, 0.15)', label: '蓝' },
-    { fg: '#cba6f7', bg: 'rgba(203, 166, 247, 0.15)', label: '紫' },
-    { fg: '#fab387', bg: 'rgba(250, 179, 135, 0.15)', label: '橙' },
-    { fg: '#94e2d5', bg: 'rgba(148, 226, 213, 0.15)', label: '青' },
-  ];
+  const updateKeyword = (id, value) => {
+    onFilterItemsChange(filterItems.map(item => item.id === id ? { ...item, keyword: value } : item));
+  };
 
   return (
     <div className="filter-inline">
@@ -1388,45 +1391,58 @@ function FilterPanelInline({ filterItems, onFilterItemsChange, filterMode, onFil
         />
         <button className="toolbar-btn small" onClick={handleQuickAdd} title="添加筛选条件">+ 添加</button>
       </div>
-      <div className="filter-inline-list" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {filterItems.map(item => (
-          <div key={item.id} style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            padding: '4px 8px', background: 'var(--bg-panel)', borderRadius: 4,
-            borderLeft: `3px solid ${item.fgColor}`,
-            fontSize: 12,
-          }}>
-            <input type="checkbox" checked={item.enabled} onChange={() => toggleItem(item.id)} title="启用/禁用" />
-            <span className="filter-inline-keyword" style={{ color: item.fgColor, fontWeight: 600, minWidth: 80 }}>{item.keyword}</span>
-            {item.isRegex && <span className="filter-inline-badge" style={{ fontSize: 10, color: 'var(--text-muted)' }}>.*</span>}
+      <div className="filter-inline-list" style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {safeItems.map(item => (
+          <div key={item.id}
+            onMouseEnter={() => setHoveredId(item.id)}
+            onMouseLeave={() => setHoveredId(null)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '3px 8px', background: 'var(--bg-panel)', borderRadius: 4,
+              borderLeft: `3px solid ${item.fgColor}`,
+              fontSize: 12, transition: 'background 0.15s',
+            }}>
+            <input type="checkbox" checked={item.enabled} onChange={() => toggleItem(item.id)} title="启用/禁用"
+              style={{ margin: 0, cursor: 'pointer' }} />
+            {/* Editable keyword input */}
+            <input type="text" value={item.keyword}
+              onChange={e => updateKeyword(item.id, e.target.value)}
+              style={{
+                flex: 1, minWidth: 60, border: 'none', background: 'transparent',
+                color: item.fgColor, fontWeight: 600, fontSize: 12, outline: 'none',
+                padding: '1px 4px', borderRadius: 3,
+              }}
+              title="点击编辑关键字"
+            />
             {/* 大小写切换 */}
             <button className={`filter-inline-btn ${item.caseSensitive ? 'active-hl' : ''}`}
               onClick={() => toggleCaseSensitive(item.id)}
-              title={item.caseSensitive ? '大小写敏感 (当前: 开)' : '大小写敏感 (当前: 关)'}
-              style={{ fontSize: 10, padding: '2px 4px' }}>
+              title={item.caseSensitive ? '大小写敏感' : '大小写不敏感'}
+              style={{ fontSize: 10, padding: '1px 4px', opacity: item.caseSensitive ? 1 : 0.5 }}>
               Aa
             </button>
-            {/* 排除/包含 */}
-            <button className={`filter-inline-btn ${item.exclude ? 'active-exclude' : ''}`}
-              onClick={() => toggleExclude(item.id)}
-              title={item.exclude ? '排除模式' : '包含模式'}>
-              {item.exclude ? '排除' : '包含'}
-            </button>
-            {/* 整行高亮 */}
-            <button className={`filter-inline-btn ${item.highlightRow ? 'active-hl' : ''}`}
-              onClick={() => toggleHighlight(item.id)}
-              title={item.highlightRow ? '整行高亮' : '仅关键字高亮'}>
-              {item.highlightRow ? '█行' : '░字'}
-            </button>
-            {/* 颜色选择 - 显示当前色块 + 颜色选择器 */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>色:</span>
-              <input type="color" value={item.fgColor} onChange={e => updateColor(item.id, 'fgColor', e.target.value)}
-                style={{ width: 20, height: 20, border: 'none', cursor: 'pointer', padding: 0, background: 'transparent' }} title="前景色" />
-            </div>
+            {/* 高级选项 - hover时显示 */}
+            {hoveredId === item.id && (
+              <>
+                <button className={`filter-inline-btn ${item.exclude ? 'active-exclude' : ''}`}
+                  onClick={() => toggleExclude(item.id)}
+                  title={item.exclude ? '排除模式' : '包含模式'}
+                  style={{ fontSize: 10, padding: '1px 4px' }}>
+                  {item.exclude ? '排除' : '包含'}
+                </button>
+                <button className={`filter-inline-btn ${item.highlightRow ? 'active-hl' : ''}`}
+                  onClick={() => toggleHighlight(item.id)}
+                  title={item.highlightRow ? '整行高亮' : '仅关键字高亮'}
+                  style={{ fontSize: 10, padding: '1px 4px' }}>
+                  {item.highlightRow ? '行' : '字'}
+                </button>
+                <input type="color" value={item.fgColor} onChange={e => updateColor(item.id, 'fgColor', e.target.value)}
+                  style={{ width: 16, height: 16, border: 'none', cursor: 'pointer', padding: 0, background: 'transparent' }} title="前景色" />
+              </>
+            )}
             {/* 删除 */}
             <button className="filter-inline-btn" onClick={() => removeItem(item.id)} title="删除此条件"
-              style={{ marginLeft: 'auto', color: '#f38ba8' }}>×</button>
+              style={{ marginLeft: 'auto', color: '#f38ba8', opacity: 0.7, fontSize: 14 }}>×</button>
           </div>
         ))}
         {filterItems.length === 0 && <div style={{ color: 'var(--text-muted)', fontSize: 12, padding: '8px 0' }}>在上方输入关键字后按回车或点击"添加"按钮添加筛选条件</div>}
@@ -1438,36 +1454,65 @@ function FilterPanelInline({ filterItems, onFilterItemsChange, filterMode, onFil
 function ChartPanelInline({ lines, extractors, chartData: chartDataProp, onAddExtractor, onUpdateExtractor, onRemoveExtractor,
   xAxisMode, onXAxisModeChange, xAxisField, onXAxisFieldChange,
   thresholds, onAddThreshold, onUpdateThreshold, onRemoveThreshold,
-  annotations, onJumpToLine, chartLinkedLine, fullscreen }) {
+  annotations, onJumpToLine, chartLinkedLine, fullscreen, filterItems }) {
 
   const chartRef = useRef(null);
   const chartInstance = useRef(null);
 
   // Frequency mode state
   const [chartMode, setChartMode] = useState('extract');
-  const [freqKeyword, setFreqKeyword] = useState('');
+  const [freqKeywords, setFreqKeywords] = useState([]); // [{keyword, color}]
+  const [freqInput, setFreqInput] = useState('');
   const [freqWindowSize, setFreqWindowSize] = useState(100);
 
-  // Compute frequency data
+  const freqColors = ['#cba6f7', '#f38ba8', '#a6e3a1', '#f9e2af', '#89b4fa', '#fab387', '#94e2d5'];
+
+  // Add a frequency keyword
+  const addFreqKeyword = (keyword) => {
+    const kw = keyword.trim();
+    if (!kw || freqKeywords.some(f => f.keyword.toLowerCase() === kw.toLowerCase())) return;
+    setFreqKeywords(prev => [...prev, { keyword: kw, color: freqColors[prev.length % freqColors.length] }]);
+  };
+
+  // Import all enabled filter keywords as frequency keywords
+  const importFromFilters = () => {
+    if (!filterItems) return;
+    const enabled = filterItems.filter(f => f.enabled && f.keyword && f.keyword.trim());
+    const newKws = [];
+    for (const f of enabled) {
+      const kw = f.keyword.trim();
+      if (!kw || freqKeywords.some(ex => ex.keyword.toLowerCase() === kw.toLowerCase())) continue;
+      newKws.push({ keyword: kw, color: f.fgColor || freqColors[(freqKeywords.length + newKws.length) % freqColors.length] });
+    }
+    if (newKws.length > 0) setFreqKeywords(prev => [...prev, ...newKws]);
+  };
+
+  // Compute frequency data for all keywords
   const freqData = React.useMemo(() => {
-    if (!freqKeyword.trim() || lines.length === 0) return null;
-    const kw = freqKeyword.trim().toLowerCase();
+    if (freqKeywords.length === 0 || lines.length === 0) return null;
     const windowSize = freqWindowSize;
     const numWindows = Math.ceil(lines.length / windowSize);
-    const counts = new Array(numWindows).fill(0);
+    const windows = [];
+    for (let w = 0; w < numWindows; w++) {
+      const point = {
+        windowIndex: w,
+        windowStart: w * windowSize,
+        windowEnd: Math.min((w + 1) * windowSize - 1, lines.length - 1),
+      };
+      for (const fk of freqKeywords) point[fk.keyword] = 0;
+      windows.push(point);
+    }
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].text.toLowerCase().includes(kw)) {
-        const winIdx = Math.floor(i / windowSize);
-        counts[winIdx]++;
+      const text = lines[i].text;
+      const winIdx = Math.floor(i / windowSize);
+      for (const fk of freqKeywords) {
+        if (text.toLowerCase().includes(fk.keyword.toLowerCase())) {
+          windows[winIdx][fk.keyword]++;
+        }
       }
     }
-    return counts.map((count, i) => ({
-      windowIndex: i,
-      windowStart: i * windowSize,
-      windowEnd: Math.min((i + 1) * windowSize - 1, lines.length - 1),
-      count,
-    }));
-  }, [lines, freqKeyword, freqWindowSize]);
+    return windows;
+  }, [lines, freqKeywords, freqWindowSize]);
 
   // Use prop chartData if provided, otherwise fall back to inline computation
   const chartData = chartDataProp !== undefined ? chartDataProp : React.useMemo(() => {
@@ -1507,23 +1552,24 @@ function ChartPanelInline({ lines, extractors, chartData: chartDataProp, onAddEx
     }
 
     if (chartMode === 'frequency') {
-      // Render frequency chart
       if (!freqData || freqData.length === 0) { chartInstance.current.clear(); return; }
       const xData = freqData.map(d => `${d.windowStart}-${d.windowEnd}`);
+      const series = freqKeywords.map(fk => ({
+        name: fk.keyword, type: 'line',
+        data: freqData.map(d => d[fk.keyword] ?? 0),
+        smooth: true, symbol: 'circle', symbolSize: 2,
+        lineStyle: { width: 2, color: fk.color },
+        itemStyle: { color: fk.color },
+        areaStyle: { color: fk.color.replace(')', ', 0.1)').replace('rgb', 'rgba') },
+      }));
       chartInstance.current.setOption({
         backgroundColor: 'transparent',
-        title: { text: `"${freqKeyword}" 出现频率 (每${freqWindowSize}行)`, textStyle: { color: '#8a8f98', fontSize: 12 }, left: 'center', top: 0 },
+        legend: { data: freqKeywords.map(f => f.keyword), top: 0, textStyle: { color: '#8a8f98', fontSize: 11 } },
         grid: { left: 50, right: 20, top: 30, bottom: 25 },
         xAxis: { type: 'category', data: xData, axisLabel: { color: '#8a8f98', fontSize: 9, rotate: 45 } },
         yAxis: { type: 'value', name: '出现次数', nameTextStyle: { color: '#8a8f98', fontSize: 10 }, axisLabel: { color: '#8a8f98', fontSize: 10 }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } } },
         dataZoom: [{ type: 'inside' }, { type: 'slider', bottom: 0, height: 16 }],
-        series: [{
-          name: '频率', type: 'line', data: freqData.map(d => d.count),
-          smooth: true, symbol: 'circle', symbolSize: 3,
-          lineStyle: { width: 2, color: '#cba6f7' },
-          itemStyle: { color: '#cba6f7' },
-          areaStyle: { color: 'rgba(203, 166, 247, 0.15)' },
-        }],
+        series,
       }, true);
     } else {
       // Render extract-based chart
@@ -1563,7 +1609,7 @@ function ChartPanelInline({ lines, extractors, chartData: chartDataProp, onAddEx
     const handleResize = () => chartInstance.current?.resize();
     window.addEventListener('resize', handleResize);
     return () => { window.removeEventListener('resize', handleResize); };
-  }, [chartMode, chartData, extractors, xAxisMode, xAxisField, thresholds, freqData, freqKeyword, freqWindowSize]);
+  }, [chartMode, chartData, extractors, xAxisMode, xAxisField, thresholds, freqData, freqKeywords, freqWindowSize]);
 
   // Cleanup chart instance on unmount
   useEffect(() => {
@@ -1582,12 +1628,20 @@ function ChartPanelInline({ lines, extractors, chartData: chartDataProp, onAddEx
         <button className={`toolbar-btn small ${chartMode === 'frequency' ? 'active' : ''}`} onClick={() => setChartMode('frequency')}>频率统计</button>
         {chartMode === 'frequency' ? (
           <>
-            <input className="toolbar-input" style={{ width: 120, fontSize: 12 }} placeholder="输入关键字..."
-              value={freqKeyword} onChange={e => setFreqKeyword(e.target.value)} />
+            <input className="toolbar-input" style={{ width: 110, fontSize: 12 }} placeholder="关键字..."
+              value={freqInput} onChange={e => setFreqInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && freqInput.trim()) { addFreqKeyword(freqInput); setFreqInput(''); } }} />
+            <button className="toolbar-btn small" onClick={() => { if (freqInput.trim()) { addFreqKeyword(freqInput); setFreqInput(''); } }}>+ 添加</button>
+            {filterItems && filterItems.filter(f => f.enabled).length > 0 && (
+              <button className="toolbar-btn small" onClick={importFromFilters} title="从筛选条件导入所有启用的关键字">从筛选导入</button>
+            )}
             <select value={freqWindowSize} onChange={e => setFreqWindowSize(Number(e.target.value))} style={{ fontSize: 12 }}>
               <option value={50}>每50行</option><option value={100}>每100行</option>
               <option value={200}>每200行</option><option value={500}>每500行</option>
             </select>
+            {freqKeywords.length > 0 && (
+              <button className="toolbar-btn small" onClick={() => setFreqKeywords([])} style={{ color: '#f38ba8' }}>清空</button>
+            )}
           </>
         ) : (
           <>
@@ -1631,15 +1685,16 @@ function ChartPanelInline({ lines, extractors, chartData: chartDataProp, onAddEx
         )}
       </div>
 
-      {/* Frequency mode: stats summary */}
-      {chartMode === 'frequency' && freqData && freqData.length > 0 && (
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 4, fontSize: 11 }}>
-          <div style={{ background: 'var(--bg-panel)', padding: '2px 8px', borderRadius: 4, borderLeft: '3px solid #cba6f7' }}>
-            <span style={{ color: '#cba6f7', fontWeight: 600 }}>"{freqKeyword}"</span>
-            <span style={{ color: 'var(--text-muted)', marginLeft: 6 }}>总计:{freqData.reduce((s, d) => s + d.count, 0)}次</span>
-            <span style={{ color: 'var(--text-muted)' }}> 窗口:{freqData.length}个</span>
-            <span style={{ color: 'var(--text-muted)' }}> 峰值:{Math.max(...freqData.map(d => d.count))}次/窗口</span>
-          </div>
+      {/* Frequency mode: keyword list & stats */}
+      {chartMode === 'frequency' && freqKeywords.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
+          {freqKeywords.map((fk, i) => (
+            <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, background: 'var(--bg-panel)', padding: '2px 8px', borderRadius: 4, borderLeft: `3px solid ${fk.color}` }}>
+              <span style={{ color: fk.color, fontWeight: 600 }}>{fk.keyword}</span>
+              {freqData && <span style={{ color: 'var(--text-muted)', marginLeft: 4 }}>总计:{freqData.reduce((s, d) => s + (d[fk.keyword] || 0), 0)}次</span>}
+              <button style={{ background: 'none', border: 'none', color: '#f38ba8', cursor: 'pointer', fontSize: 12, padding: 0 }} onClick={() => setFreqKeywords(prev => prev.filter((_, idx) => idx !== i))}>×</button>
+            </div>
+          ))}
         </div>
       )}
 
@@ -1673,14 +1728,14 @@ function ChartPanelInline({ lines, extractors, chartData: chartDataProp, onAddEx
             : '正则未匹配到有效数值，请确保正则包含捕获组且匹配数字'}
         </div>
       )}
-      {chartMode === 'frequency' && (!freqKeyword.trim()) && (
+      {chartMode === 'frequency' && freqKeywords.length === 0 && (
         <div style={{ color: 'var(--text-muted)', fontSize: 11, padding: '8px 0', textAlign: 'center' }}>
-          输入关键字后查看其在日志中的出现频率分布
+          输入关键字后按回车添加，或点击"从筛选导入"使用筛选条件中的关键字
         </div>
       )}
-      {chartMode === 'frequency' && freqKeyword.trim() && freqData && freqData.length > 0 && freqData.every(d => d.count === 0) && (
+      {chartMode === 'frequency' && freqKeywords.length > 0 && freqData && freqData.every(d => freqKeywords.every(fk => d[fk.keyword] === 0)) && (
         <div style={{ color: 'var(--text-muted)', fontSize: 11, padding: '8px 0', textAlign: 'center' }}>
-          未找到包含 "{freqKeyword}" 的日志行
+          所有关键字在日志中均未匹配到内容
         </div>
       )}
 
